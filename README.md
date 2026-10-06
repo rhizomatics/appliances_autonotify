@@ -1,4 +1,4 @@
-# Appliances Supernotifications
+# Appliances SuperNotifications
 
 Automatic notifications for household appliances in Home Assistant, with no automations or YAML.
 
@@ -22,8 +22,8 @@ Without Supernotify, it only sends a start and an end notification, to notify en
 ## Install
 
 1. In HACS, add `https://github.com/rhizomatics/appliances_supernotifications` as a custom repository of type
-   *Integration*, install *Appliances Supernotifications* and restart Home Assistant
-2. In *Settings*, *Devices & services*, choose *Add integration* and pick *Appliances Supernotifications*
+   *Integration*, install *Appliances SuperNotifications* and restart Home Assistant
+2. In *Settings*, *Devices & services*, choose *Add integration* and pick *Appliances SuperNotifications*
 3. Choose an appliance from the list of those found, and optionally change its settings
 
 Once the first appliance is set up, any others are offered automatically as *Discovered* on the

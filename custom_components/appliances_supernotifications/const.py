@@ -1,4 +1,4 @@
-"""Constants for Appliances Supernotifications"""
+"""Constants for Appliances SuperNotifications"""
 
 from typing import Final
 

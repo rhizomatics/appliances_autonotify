@@ -1,4 +1,4 @@
-"""Appliances Supernotifications - automatic notifications for household appliance cycles"""
+"""Appliances SuperNotifications - automatic notifications for household appliance cycles"""
 
 from __future__ import annotations
 
