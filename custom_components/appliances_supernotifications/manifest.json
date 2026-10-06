@@ -1,0 +1,21 @@
+{
+    "domain": "appliances_supernotifications",
+    "name": "Appliances Supernotifications",
+    "after_dependencies": [
+        "home_connect",
+        "supernotify"
+    ],
+    "codeowners": [
+        "@jey"
+    ],
+    "config_flow": true,
+    "dependencies": [
+        "notify"
+    ],
+    "documentation": "https://github.com/rhizomatics/appliances_supernotifications",
+    "integration_type": "service",
+    "iot_class": "calculated",
+    "issue_tracker": "https://github.com/rhizomatics/appliances_supernotifications/issues",
+    "requirements": [],
+    "version": "0.1.0"
+}

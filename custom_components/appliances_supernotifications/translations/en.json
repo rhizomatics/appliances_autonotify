@@ -1,0 +1,69 @@
+{
+    "config": {
+        "flow_title": "{name}",
+        "step": {
+            "user": {
+                "title": "Appliance notifications",
+                "description": "Choose an appliance to notify about when its cycle starts and ends.\n\n{supernotify}",
+                "data": {
+                    "device_id": "Appliance"
+                }
+            },
+            "settings": {
+                "title": "Notifications for {name}",
+                "description": "{supernotify}\n\nLeave a title or message empty to use the default. `{placeholder}` is replaced by the name of the appliance.",
+                "data": {
+                    "start_title": "Start title",
+                    "start_message": "Start message",
+                    "end_title": "End title",
+                    "end_message": "End message",
+                    "targets": "Targets",
+                    "target": "Targets",
+                    "custom_target": "Custom targets",
+                    "deliveries": "Deliveries"
+                },
+                "data_description": {
+                    "targets": "Notify entities to send to. At least one is needed, since Supernotify is not installed.",
+                    "target": "Who or what to notify, as for any Supernotify notification. Leave empty for Supernotify to choose.",
+                    "custom_target": "Targets outside of Home Assistant, such as e-mail addresses or phone numbers.",
+                    "deliveries": "Limit notifications to these Supernotify deliveries. Leave empty for Supernotify to choose."
+                }
+            }
+        },
+        "error": {
+            "targets_required": "Choose at least one notify entity, since Supernotify is not installed"
+        },
+        "abort": {
+            "already_configured": "This appliance is already set up",
+            "already_in_progress": "Set up of this appliance is already in progress",
+            "no_appliances": "No supported appliances were found that aren't already set up. Only Home Connect (Bosch, Neff, Siemens) appliances are supported so far."
+        }
+    },
+    "options": {
+        "step": {
+            "init": {
+                "title": "Notifications for {name}",
+                "description": "{supernotify}\n\nLeave a title or message empty to use the default. `{placeholder}` is replaced by the name of the appliance.",
+                "data": {
+                    "start_title": "Start title",
+                    "start_message": "Start message",
+                    "end_title": "End title",
+                    "end_message": "End message",
+                    "targets": "Targets",
+                    "target": "Targets",
+                    "custom_target": "Custom targets",
+                    "deliveries": "Deliveries"
+                },
+                "data_description": {
+                    "targets": "Notify entities to send to. At least one is needed, since Supernotify is not installed.",
+                    "target": "Who or what to notify, as for any Supernotify notification. Leave empty for Supernotify to choose.",
+                    "custom_target": "Targets outside of Home Assistant, such as e-mail addresses or phone numbers.",
+                    "deliveries": "Limit notifications to these Supernotify deliveries. Leave empty for Supernotify to choose."
+                }
+            }
+        },
+        "error": {
+            "targets_required": "Choose at least one notify entity, since Supernotify is not installed"
+        }
+    }
+}

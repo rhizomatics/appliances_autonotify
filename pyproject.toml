@@ -1,0 +1,69 @@
+[project]
+name = "appliances_supernotifications"
+description = "Home Assistant custom component for automatic household appliance notifications and Live Activities"
+readme = "README.md"
+version = "0.1.0"
+requires-python = ">=3.14.2"
+dependencies = [
+    "homeassistant>=2026.9.0",
+]
+
+[dependency-groups]
+dev = [
+    "homeassistant-stubs",
+    "pytest",
+    "pytest-cov",
+    "pytest-asyncio",
+    "pytest-homeassistant-custom-component>=0.13.356",
+    "pre-commit",
+    "ruff",
+    "codespell",
+    "mypy",
+    "voluptuous-stubs>=0.1.1",
+]
+
+[tool.uv]
+override-dependencies = [
+    "homeassistant==2026.9.3",
+    "homeassistant-stubs==2026.9.3",
+]
+
+[tool.ruff]
+line-length = 128
+indent-width = 4
+target-version = "py314"
+
+[tool.ruff.lint]
+extend-select = ["ANN", "PYI"]
+preview = true
+ignore = [
+    "BLE001", # Blind except
+    "SIM117", # Multiple with statements
+]
+
+[tool.ruff.lint.flake8-annotations]
+allow-star-arg-any = true
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["ANN201", "ANN204", "ANN001", "ANN202", "ARG001", "ARG002"]
+
+[tool.ruff.format]
+preview = true
+
+[tool.codespell]
+ignore-words-list = "hass"
+skip = "*.json,./.*,./htmlcov"
+quiet-level = 2
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+addopts = [
+    "--cov=custom_components.appliances_supernotifications",
+    "--cov-report=term-missing",
+    "--cov-fail-under=90",
+]
+
+[[tool.mypy.overrides]]
+module = ["pytest_homeassistant_custom_component.*"]
+follow_untyped_imports = true
