@@ -18,6 +18,7 @@ CONF_DELIVERIES: Final[str] = "deliveries"
 
 # English only for the MVP
 NAME_PLACEHOLDER: Final[str] = "{name}"
+DEFAULT_TITLE: Final[str] = "{name}"
 DEFAULT_START_MESSAGE: Final[str] = "{name} started"
 DEFAULT_END_MESSAGE: Final[str] = "{name} is finished"
 PROGRESS_MESSAGE: Final[str] = "{progress}% complete"
@@ -33,11 +34,12 @@ PROGRESS_KEY: Final[str] = "program_progress"
 FINISH_TIME_KEY: Final[str] = "program_finish_time"
 
 STATE_RUN: Final[str] = "run"
-STATE_FINISHED: Final[str] = "finished"
 # a cycle already under way, so not a new start when `run` follows
 STATES_ACTIVE: Final[tuple[str, ...]] = ("run", "pause", "actionrequired")
+# the cycle is over, an oven switched off goes straight from `run` to `ready` or `inactive` without ever being `finished`
+STATES_FINISHED: Final[tuple[str, ...]] = ("finished", "ready", "inactive")
 # the cycle is over without finishing, so the Live Activity goes without an end notification
-STATES_ABANDONED: Final[tuple[str, ...]] = ("inactive", "ready", "error", "aborting")
+STATES_ABANDONED: Final[tuple[str, ...]] = ("error", "aborting")
 
 # percentage points between Live Activity updates, since mobile platforms throttle frequent ones
 PROGRESS_STEP: Final[int] = 10

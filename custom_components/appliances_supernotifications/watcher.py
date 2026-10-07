@@ -26,6 +26,7 @@ from .const import (
     DEFAULT_END_MESSAGE,
     DEFAULT_ICON,
     DEFAULT_START_MESSAGE,
+    DEFAULT_TITLE,
     FINISH_TIME_KEY,
     ICONS,
     MOBILE_PUSH_TRANSPORT,
@@ -33,10 +34,10 @@ from .const import (
     PROGRESS_KEY,
     PROGRESS_MESSAGE,
     PROGRESS_STEP,
-    STATE_FINISHED,
     STATE_RUN,
     STATES_ABANDONED,
     STATES_ACTIVE,
+    STATES_FINISHED,
     SUPERNOTIFY_DOMAIN,
 )
 from .supernotify_api import deliveries_by_transport, supernotify_available
@@ -93,11 +94,12 @@ class ApplianceWatcher:
         if new_state is None:
             return
         state: str = new_state.state
+        _LOGGER.debug("APPLIANCES %s cycle state %s, running: %s", self.name, state, self.running)
         if state == STATE_RUN and not self.running:
             self.running = True
             self.last_progress_step = 0
             await self._started()
-        elif state == STATE_FINISHED and self.running:
+        elif state in STATES_FINISHED and self.running:
             self.running = False
             await self._ended(finished=True)
         elif state in STATES_ABANDONED and self.running:
@@ -116,13 +118,13 @@ class ApplianceWatcher:
         # a Live Activity keeps the title it started with
         await self._supernotify(
             PROGRESS_MESSAGE.format(progress=progress),
-            self._text(CONF_START_TITLE, self.name),
+            self._text(CONF_START_TITLE, DEFAULT_TITLE),
             mobile_only=True,
             extra_data=self._live_data() | {"silent": True, "alert_once": True},
         )
 
     async def _started(self) -> None:
-        title = self._text(CONF_START_TITLE, self.name)
+        title = self._text(CONF_START_TITLE, DEFAULT_TITLE)
         message = self._text(CONF_START_MESSAGE, DEFAULT_START_MESSAGE)
         if supernotify_available(self.hass):
             await self._supernotify(message, title, extra_data=self._live_data())
@@ -130,7 +132,7 @@ class ApplianceWatcher:
             await self._send_message(message, title)
 
     async def _ended(self, finished: bool) -> None:
-        title = self._text(CONF_END_TITLE, self.name)
+        title = self._text(CONF_END_TITLE, DEFAULT_TITLE)
         message = self._text(CONF_END_MESSAGE, DEFAULT_END_MESSAGE)
         if not supernotify_available(self.hass):
             if finished:

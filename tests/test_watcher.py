@@ -98,6 +98,22 @@ async def test_progress_updates_mobile_only(hass: HomeAssistant) -> None:
     assert len(calls) == 3
 
 
+async def test_cycle_ends_without_finished_state(hass: HomeAssistant) -> None:
+    appliance = add_appliance(hass, "Oven")
+    calls = mock_supernotify(hass)
+    await setup_watcher(hass, appliance)
+
+    # an oven switched off never reports `finished`
+    await set_state(hass, appliance.cycle, "run")
+    await set_state(hass, appliance.cycle, "ready")
+    assert len(calls) == 3
+    assert calls[1].data["extra_data"]["mobile_push_clear_notification"] is True
+    assert calls[2].data == {"message": "Oven is finished", "title": "Oven"}
+
+    await set_state(hass, appliance.cycle, "inactive")
+    assert len(calls) == 3
+
+
 async def test_abandoned_cycle_clears_without_end_notification(hass: HomeAssistant) -> None:
     appliance = add_appliance(hass)
     calls = mock_supernotify(hass)
