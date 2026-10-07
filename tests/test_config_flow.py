@@ -27,7 +27,7 @@ def suggested(result) -> dict[str, Any]:
 
 async def test_user_flow_without_supernotify(hass: HomeAssistant) -> None:
     appliance = add_appliance(hass)
-    result = await start_found(hass)
+    result: ConfigFlowResult = await start_found(hass)
     assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == "found"
     assert result["description_placeholders"] == {
@@ -35,6 +35,9 @@ async def test_user_flow_without_supernotify(hass: HomeAssistant) -> None:
         "supernotify": SUPERNOTIFY_MISSING,
         "placeholder": "{name}",
     }
+    assert "data_schema" in result
+    assert result["data_schema"] is not None
+    assert result["data_schema"].schema is not None
     assert "deliveries" not in result["data_schema"].schema
     # titles and messages start out as the default text
     assert suggested(result) == {
@@ -63,6 +66,11 @@ async def test_user_flow_with_supernotify(hass: HomeAssistant) -> None:
     add_appliance(hass)
     mock_supernotify(hass)
     result = await start_found(hass)
+    assert "data_schema" in result
+    assert result["data_schema"] is not None
+    assert result["data_schema"].schema is not None
+    assert result["description_placeholders"] is not None
+
     assert result["description_placeholders"]["supernotify"] == SUPERNOTIFY_PRESENT
     deliveries = next(v for k, v in result["data_schema"].schema.items() if k == "deliveries")
     assert deliveries.config["options"] == ["chimes", "email", "mobile_push", "phones"]
@@ -86,7 +94,8 @@ async def test_user_flow_sets_up_every_appliance(hass: HomeAssistant) -> None:
     await hass.async_block_till_done()
     assert len(hass.config_entries.flow.async_progress_by_handler(DOMAIN)) == 2
 
-    result = await start_found(hass)
+    result: ConfigFlowResult = await start_found(hass)
+    assert result["description_placeholders"] is not None
     assert result["description_placeholders"]["name"] == "Dishwasher, Oven"
 
     options = {"targets": ["notify.kitchen_display"], "start_message": "{name} is go"}

@@ -137,16 +137,12 @@ async def test_progress_update_cannot_overtake_the_end(hass: HomeAssistant) -> N
 async def test_live_activity_cleared_on_delivery_known_only_by_its_switch(hass: HomeAssistant) -> None:
     appliance = add_appliance(hass)
     # Delivery Control can leave the standard mobile push delivery neither implicit nor configured
-    async_mock_service(
-        hass, "supernotify", "enquire_implicit_deliveries", response={}, supports_response=SupportsResponse.ONLY
-    )
+    async_mock_service(hass, "supernotify", "enquire_implicit_deliveries", response={}, supports_response=SupportsResponse.ONLY)
     async_mock_service(
         hass, "supernotify", "enquire_configuration", response={"delivery": {}}, supports_response=SupportsResponse.ONLY
     )
     calls = async_mock_service(hass, "supernotify", "notify")
-    hass.states.async_set(
-        "switch.supernotify_delivery_mobile_push", "on", {"name": "mobile_push", "transport": "mobile_push"}
-    )
+    hass.states.async_set("switch.supernotify_delivery_mobile_push", "on", {"name": "mobile_push", "transport": "mobile_push"})
     hass.states.async_set("switch.supernotify_delivery_chimes", "on", {"name": "chimes", "transport": "chime"})
     await setup_watcher(hass, appliance)
 
