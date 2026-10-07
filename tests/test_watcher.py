@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+from datetime import timedelta
+
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import CONF_DEVICE_ID
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
-from pytest_homeassistant_custom_component.common import MockConfigEntry, async_mock_service
+from homeassistant.util import dt as dt_util
+from pytest_homeassistant_custom_component.common import MockConfigEntry, async_fire_time_changed, async_mock_service
 
 from custom_components.appliances_supernotifications.const import DOMAIN
 
@@ -224,3 +227,98 @@ async def test_setup_retried_when_appliance_missing(hass: HomeAssistant) -> None
     entry.add_to_hass(hass)
     assert not await hass.config_entries.async_setup(entry.entry_id)
     assert entry.state is ConfigEntryState.SETUP_RETRY
+
+
+async def setup_power_watcher(hass: HomeAssistant, **options: float) -> MockConfigEntry:
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Washer",
+        unique_id="sensor.washer_power",
+        data={"type": "power"},
+        options={"power_entity": "sensor.washer_power", **options},
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    return entry
+
+
+async def pass_time(hass: HomeAssistant, seconds: float) -> None:
+    async_fire_time_changed(hass, dt_util.utcnow() + timedelta(seconds=seconds))
+    await hass.async_block_till_done()
+
+
+async def test_power_monitored_cycle(hass: HomeAssistant, freezer) -> None:
+    calls = mock_supernotify(hass)
+    hass.states.async_set("sensor.washer_power", "0.4", {"unit_of_measurement": "W"})
+    entry = await setup_power_watcher(hass)
+    tag = f"appliance_{entry.entry_id}"
+
+    # at the threshold isn't running
+    await set_state(hass, "sensor.washer_power", "1")
+    assert not calls
+
+    await set_state(hass, "sensor.washer_power", "1800")
+    assert len(calls) == 1
+    assert calls[0].data == {
+        "message": "Washer started",
+        "title": "Washer",
+        "extra_data": {"mobile_push_notification_tag": tag, "live_update": True, "notification_icon": "mdi:washing-machine"},
+    }
+
+    # a drop out shorter than the grace period is the same cycle
+    await set_state(hass, "sensor.washer_power", "0")
+    freezer.tick(6)
+    await pass_time(hass, 0)
+    await set_state(hass, "sensor.washer_power", "unavailable")
+    await set_state(hass, "sensor.washer_power", "300")
+    freezer.tick(6)
+    await pass_time(hass, 0)
+    assert len(calls) == 1
+
+    # the grace period is from when the power first dropped
+    await set_state(hass, "sensor.washer_power", "0.8")
+    freezer.tick(6)
+    await pass_time(hass, 0)
+    await set_state(hass, "sensor.washer_power", "0.2")
+    assert len(calls) == 1
+    freezer.tick(5)
+    await pass_time(hass, 0)
+    assert len(calls) == 3
+    assert calls[1].data["extra_data"] == {"mobile_push_notification_tag": tag, "mobile_push_clear_notification": True}
+    assert calls[2].data == {"message": "Washer is finished", "title": "Washer"}
+
+    # ended only once
+    await set_state(hass, "sensor.washer_power", "0")
+    freezer.tick(60)
+    await pass_time(hass, 0)
+    assert len(calls) == 3
+
+
+async def test_power_threshold_grace_and_units(hass: HomeAssistant, freezer) -> None:
+    calls = mock_supernotify(hass)
+    # running at startup, so no start is notified
+    hass.states.async_set("sensor.washer_power", "1.2", {"unit_of_measurement": "kW"})
+    entry = await setup_power_watcher(hass, threshold=50, grace_period=120)
+    assert entry.runtime_data.running
+    assert not calls
+
+    await set_state(hass, "sensor.washer_power", "0.04")
+    freezer.tick(119)
+    await pass_time(hass, 0)
+    assert not calls
+    freezer.tick(2)
+    await pass_time(hass, 0)
+    assert [c.data["message"] for c in calls] == ["Washer is finished", "Washer is finished"]
+
+    hass.states.async_set("sensor.washer_power", "0.06", {"unit_of_measurement": "kW"})
+    await hass.async_block_till_done()
+    assert len(calls) == 3
+
+    # nothing left waiting once unloaded
+    hass.states.async_set("sensor.washer_power", "0", {"unit_of_measurement": "kW"})
+    await hass.async_block_till_done()
+    assert await hass.config_entries.async_unload(entry.entry_id)
+    freezer.tick(300)
+    await pass_time(hass, 0)
+    assert len(calls) == 3

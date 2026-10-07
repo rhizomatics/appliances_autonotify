@@ -4,11 +4,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from homeassistant.const import CONF_TYPE
 from homeassistant.helpers import config_validation as cv
 
-from .const import DOMAIN
+from .const import DOMAIN, TYPE_POWER
 from .discovery import async_start_discovery
-from .watcher import ApplianceWatcher
+from .watcher import ApplianceWatcher, HomeConnectWatcher, PowerWatcher
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
@@ -26,7 +27,8 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: AppliancesConfigEntry) -> bool:
-    watcher = ApplianceWatcher(hass, entry)
+    watcher_class = PowerWatcher if entry.data.get(CONF_TYPE) == TYPE_POWER else HomeConnectWatcher
+    watcher: ApplianceWatcher = watcher_class(hass, entry)
     watcher.async_start()
     entry.runtime_data = watcher
     return True

@@ -15,6 +15,15 @@ CONF_TARGETS: Final[str] = "targets"
 CONF_TARGET: Final[str] = "target"
 CONF_CUSTOM_TARGET: Final[str] = "custom_target"
 CONF_DELIVERIES: Final[str] = "deliveries"
+# an appliance with no integration of its own, known only by the power it draws
+TYPE_POWER: Final[str] = "power"
+CONF_POWER_ENTITY: Final[str] = "power_entity"
+CONF_THRESHOLD: Final[str] = "threshold"
+CONF_GRACE_PERIOD: Final[str] = "grace_period"
+# watts above which the appliance is running
+DEFAULT_THRESHOLD: Final[float] = 1
+# seconds at or below the threshold before the cycle is over, so short drop outs are ignored
+DEFAULT_GRACE_PERIOD: Final[float] = 60
 
 # English only for the MVP
 NAME_PLACEHOLDER: Final[str] = "{name}"

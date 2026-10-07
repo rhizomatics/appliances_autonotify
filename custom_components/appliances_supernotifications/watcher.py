@@ -5,27 +5,33 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any
 
-from homeassistant.const import ATTR_ENTITY_ID, CONF_DEVICE_ID
-from homeassistant.core import Event, EventStateChangedData, HomeAssistant, callback
+from homeassistant.const import ATTR_ENTITY_ID, ATTR_UNIT_OF_MEASUREMENT, CONF_DEVICE_ID, UnitOfPower
+from homeassistant.core import CALLBACK_TYPE, Event, EventStateChangedData, HomeAssistant, State, callback
 from homeassistant.exceptions import ConfigEntryNotReady, HomeAssistantError
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
-from homeassistant.helpers.event import async_track_state_change_event
+from homeassistant.helpers.event import async_call_later, async_track_state_change_event
 from homeassistant.util import dt as dt_util
+from homeassistant.util.unit_conversion import PowerConverter
 
 from .const import (
     CONF_CUSTOM_TARGET,
     CONF_DELIVERIES,
     CONF_END_MESSAGE,
     CONF_END_TITLE,
+    CONF_GRACE_PERIOD,
+    CONF_POWER_ENTITY,
     CONF_START_MESSAGE,
     CONF_START_TITLE,
     CONF_TARGET,
     CONF_TARGETS,
+    CONF_THRESHOLD,
     CYCLE_KEYS,
     DEFAULT_END_MESSAGE,
+    DEFAULT_GRACE_PERIOD,
     DEFAULT_ICON,
     DEFAULT_START_MESSAGE,
+    DEFAULT_THRESHOLD,
     DEFAULT_TITLE,
     FINISH_TIME_KEY,
     ICONS,
@@ -43,12 +49,16 @@ from .const import (
 from .supernotify_api import deliveries_by_transport, supernotify_available
 
 if TYPE_CHECKING:
+    from datetime import datetime
+
     from homeassistant.config_entries import ConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
 
 
 class ApplianceWatcher:
+    """The notifications of a cycle, for subclasses that know when one starts and ends"""
+
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
         self.hass = hass
         self.entry = entry
@@ -63,49 +73,7 @@ class ApplianceWatcher:
 
     @callback
     def async_start(self) -> None:
-        device_id: str = self.entry.data[CONF_DEVICE_ID]
-        device = dr.async_get(self.hass).async_get(device_id)
-        if device is not None:
-            self.name = device.name_by_user or device.name or self.name
-        for entity in er.async_entries_for_device(er.async_get(self.hass), device_id):
-            if entity.platform not in CYCLE_KEYS:
-                continue
-            if entity.translation_key == CYCLE_KEYS[entity.platform]:
-                self.cycle_entity_id = entity.entity_id
-            elif entity.translation_key == PROGRESS_KEY:
-                self.progress_entity_id = entity.entity_id
-            elif entity.translation_key == FINISH_TIME_KEY:
-                self.finish_time_entity_id = entity.entity_id
-        if self.cycle_entity_id is None:
-            raise ConfigEntryNotReady(f"No cycle state entity found for {self.name}")
-
-        # a cycle under way at startup still has its Live Activity closed when it ends
-        state = self.hass.states.get(self.cycle_entity_id)
-        self.running = state is not None and state.state in STATES_ACTIVE
-
-        self.entry.async_on_unload(async_track_state_change_event(self.hass, self.cycle_entity_id, self._cycle_changed))
-        if self.progress_entity_id is not None:
-            self.entry.async_on_unload(
-                async_track_state_change_event(self.hass, self.progress_entity_id, self._progress_changed)
-            )
-
-    async def _cycle_changed(self, event: Event[EventStateChangedData]) -> None:
-        new_state = event.data["new_state"]
-        if new_state is None:
-            return
-        state: str = new_state.state
-        _LOGGER.debug("APPLIANCES %s cycle state %s, running: %s", self.name, state, self.running)
-        if state == STATE_RUN and not self.running:
-            self.running = True
-            self.last_progress_step = 0
-            await self._started()
-        elif state in STATES_FINISHED and self.running:
-            self.running = False
-            await self._ended(finished=True)
-        elif state in STATES_ABANDONED and self.running:
-            self.running = False
-            await self._ended(finished=False)
-        # anything else, such as `unavailable` while the vendor cloud is away, leaves the cycle as it was
+        raise NotImplementedError
 
     async def _progress_changed(self, event: Event[EventStateChangedData]) -> None:
         progress = self._progress()
@@ -213,3 +181,109 @@ class ApplianceWatcher:
             )
         except HomeAssistantError:
             _LOGGER.exception("APPLIANCES Notification failed for %s", self.name)
+
+
+class HomeConnectWatcher(ApplianceWatcher):
+    """An appliance whose integration reports the state of its cycle"""
+
+    @callback
+    def async_start(self) -> None:
+        device_id: str = self.entry.data[CONF_DEVICE_ID]
+        device = dr.async_get(self.hass).async_get(device_id)
+        if device is not None:
+            self.name = device.name_by_user or device.name or self.name
+        for entity in er.async_entries_for_device(er.async_get(self.hass), device_id):
+            if entity.platform not in CYCLE_KEYS:
+                continue
+            if entity.translation_key == CYCLE_KEYS[entity.platform]:
+                self.cycle_entity_id = entity.entity_id
+            elif entity.translation_key == PROGRESS_KEY:
+                self.progress_entity_id = entity.entity_id
+            elif entity.translation_key == FINISH_TIME_KEY:
+                self.finish_time_entity_id = entity.entity_id
+        if self.cycle_entity_id is None:
+            raise ConfigEntryNotReady(f"No cycle state entity found for {self.name}")
+
+        # a cycle under way at startup still has its Live Activity closed when it ends
+        state = self.hass.states.get(self.cycle_entity_id)
+        self.running = state is not None and state.state in STATES_ACTIVE
+
+        self.entry.async_on_unload(async_track_state_change_event(self.hass, self.cycle_entity_id, self._cycle_changed))
+        if self.progress_entity_id is not None:
+            self.entry.async_on_unload(
+                async_track_state_change_event(self.hass, self.progress_entity_id, self._progress_changed)
+            )
+
+    async def _cycle_changed(self, event: Event[EventStateChangedData]) -> None:
+        new_state = event.data["new_state"]
+        if new_state is None:
+            return
+        state: str = new_state.state
+        _LOGGER.debug("APPLIANCES %s cycle state %s, running: %s", self.name, state, self.running)
+        if state == STATE_RUN and not self.running:
+            self.running = True
+            self.last_progress_step = 0
+            await self._started()
+        elif state in STATES_FINISHED and self.running:
+            self.running = False
+            await self._ended(finished=True)
+        elif state in STATES_ABANDONED and self.running:
+            self.running = False
+            await self._ended(finished=False)
+        # anything else, such as `unavailable` while the vendor cloud is away, leaves the cycle as it was
+
+
+class PowerWatcher(ApplianceWatcher):
+    """An appliance known only by the power it draws, running while that is above a threshold"""
+
+    def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
+        super().__init__(hass, entry)
+        self.power_entity_id: str = entry.options[CONF_POWER_ENTITY]
+        self.threshold: float = entry.options.get(CONF_THRESHOLD, DEFAULT_THRESHOLD)
+        self.grace_period: float = entry.options.get(CONF_GRACE_PERIOD, DEFAULT_GRACE_PERIOD)
+        self._cancel_end: CALLBACK_TYPE | None = None
+
+    @callback
+    def async_start(self) -> None:
+        # a cycle under way at startup still has its Live Activity closed when it ends
+        self.running = self._drawing(self.hass.states.get(self.power_entity_id)) is True
+        self.entry.async_on_unload(async_track_state_change_event(self.hass, self.power_entity_id, self._power_changed))
+        self.entry.async_on_unload(self._keep_running)
+
+    def _drawing(self, state: State | None) -> bool | None:
+        """Whether more power than the threshold is drawn, None if the power isn't known"""
+        try:
+            power = float(state.state) if state is not None else None
+        except ValueError:
+            power = None
+        if state is None or power is None:
+            return None
+        unit = state.attributes.get(ATTR_UNIT_OF_MEASUREMENT)
+        if unit in PowerConverter.VALID_UNITS:
+            power = PowerConverter.convert(power, unit, UnitOfPower.WATT)
+        return power > self.threshold
+
+    async def _power_changed(self, event: Event[EventStateChangedData]) -> None:
+        drawing = self._drawing(event.data["new_state"])
+        _LOGGER.debug("APPLIANCES %s drawing power %s, running: %s", self.name, drawing, self.running)
+        if drawing is None:
+            # `unavailable` while the power monitor is away leaves the cycle as it was
+            return
+        if drawing:
+            self._keep_running()
+            if not self.running:
+                self.running = True
+                await self._started()
+        elif self.running and self._cancel_end is None:
+            self._cancel_end = async_call_later(self.hass, self.grace_period, self._grace_over)
+
+    @callback
+    def _keep_running(self) -> None:
+        if self._cancel_end is not None:
+            self._cancel_end()
+            self._cancel_end = None
+
+    async def _grace_over(self, now: datetime) -> None:
+        self._cancel_end = None
+        self.running = False
+        await self._ended(finished=True)

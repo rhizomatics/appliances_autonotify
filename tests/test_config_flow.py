@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from homeassistant.config_entries import SOURCE_INTEGRATION_DISCOVERY, SOURCE_USER
+from typing import Any
+
+import voluptuous as vol
+from homeassistant.config_entries import SOURCE_INTEGRATION_DISCOVERY, SOURCE_USER, ConfigFlowResult
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers import entity_registry as er
@@ -11,15 +14,22 @@ from custom_components.appliances_supernotifications.const import DOMAIN, SUPERN
 from .conftest import add_appliance, mock_supernotify, setup_watcher
 
 
-def suggested(result) -> dict[str, str]:
+async def start_found(hass: HomeAssistant) -> ConfigFlowResult:
+    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": SOURCE_USER})
+    assert result["type"] is FlowResultType.MENU
+    assert result["menu_options"] == ["power", "found"]
+    return await hass.config_entries.flow.async_configure(result["flow_id"], {"next_step_id": "found"})
+
+
+def suggested(result) -> dict[str, Any]:
     return {k: k.description["suggested_value"] for k in result["data_schema"].schema if k.description}
 
 
 async def test_user_flow_without_supernotify(hass: HomeAssistant) -> None:
     appliance = add_appliance(hass)
-    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": SOURCE_USER})
+    result = await start_found(hass)
     assert result["type"] is FlowResultType.FORM
-    assert result["step_id"] == "user"
+    assert result["step_id"] == "found"
     assert result["description_placeholders"] == {
         "name": "Dishwasher",
         "supernotify": SUPERNOTIFY_MISSING,
@@ -52,7 +62,7 @@ async def test_user_flow_without_supernotify(hass: HomeAssistant) -> None:
 async def test_user_flow_with_supernotify(hass: HomeAssistant) -> None:
     add_appliance(hass)
     mock_supernotify(hass)
-    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": SOURCE_USER})
+    result = await start_found(hass)
     assert result["description_placeholders"]["supernotify"] == SUPERNOTIFY_PRESENT
     deliveries = next(v for k, v in result["data_schema"].schema.items() if k == "deliveries")
     assert deliveries.config["options"] == ["chimes", "email", "mobile_push", "phones"]
@@ -76,8 +86,7 @@ async def test_user_flow_sets_up_every_appliance(hass: HomeAssistant) -> None:
     await hass.async_block_till_done()
     assert len(hass.config_entries.flow.async_progress_by_handler(DOMAIN)) == 2
 
-    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": SOURCE_USER})
-    assert result["step_id"] == "user"
+    result = await start_found(hass)
     assert result["description_placeholders"]["name"] == "Dishwasher, Oven"
 
     options = {"targets": ["notify.kitchen_display"], "start_message": "{name} is go"}
@@ -93,15 +102,61 @@ async def test_user_flow_sets_up_every_appliance(hass: HomeAssistant) -> None:
 
 
 async def test_user_flow_no_appliances(hass: HomeAssistant) -> None:
+    # only an appliance to describe by hand is on offer
     result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": SOURCE_USER})
-    assert result["type"] is FlowResultType.ABORT
-    assert result["reason"] == "no_appliances"
+    assert result["type"] is FlowResultType.MENU
+    assert result["menu_options"] == ["power"]
 
-    # and none left once the only one is set up
+    # and again once the only one found is set up
     appliance = add_appliance(hass)
     await setup_watcher(hass, appliance, {"targets": ["notify.kitchen_display"]})
     result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": SOURCE_USER})
-    assert result["reason"] == "no_appliances"
+    assert result["menu_options"] == ["power"]
+
+
+async def test_power_flow(hass: HomeAssistant) -> None:
+    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": SOURCE_USER})
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {"next_step_id": "power"})
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "power"
+    defaults = {str(k): k.default() for k in result["data_schema"].schema if k.default is not vol.UNDEFINED}
+    assert defaults == {"threshold": 1, "grace_period": 10}
+
+    power = {"power_entity": "sensor.washer_power", "threshold": 5, "grace_period": 60}
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {"name": "Washer", **power})
+    assert result["step_id"] == "settings"
+    assert result["description_placeholders"]["name"] == "Washer"
+    assert suggested(result)["start_message"] == "{name} started"
+
+    settings = {"targets": ["notify.kitchen_display"], "end_message": "Hang out the washing"}
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], settings)
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["title"] == "Washer"
+    assert result["data"] == {"type": "power"}
+    assert result["options"] == settings | power
+    await hass.async_block_till_done()
+    entry = hass.config_entries.async_entries(DOMAIN)[0]
+    assert entry.runtime_data.power_entity_id == "sensor.washer_power"
+
+    # one entry for each power sensor
+    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": SOURCE_USER})
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {"next_step_id": "power"})
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {"name": "Again", **power})
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "already_configured"
+
+    # the options have the same two pages
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    assert result["step_id"] == "init"
+    result = await hass.config_entries.options.async_configure(result["flow_id"], {"targets": ["notify.hall_display"]})
+    assert result["step_id"] == "power"
+    assert "name" not in result["data_schema"].schema
+    assert suggested(result) == power
+    result = await hass.config_entries.options.async_configure(result["flow_id"], power | {"threshold": 3})
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    await hass.async_block_till_done()
+    assert entry.options == {"targets": ["notify.hall_display"], **power, "threshold": 3}
+    assert entry.runtime_data.threshold == 3
 
 
 async def test_other_appliances_discovered_once_set_up(hass: HomeAssistant) -> None:

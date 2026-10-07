@@ -4,6 +4,34 @@
         "step": {
             "user": {
                 "title": "Appliance notifications",
+                "description": "Choose the type of appliance to add. Appliances with their own supported integration are found automatically.",
+                "menu_options": {
+                    "power": "Power Monitored Appliance",
+                    "found": "Appliances found"
+                },
+                "menu_option_descriptions": {
+                    "power": "Any appliance on a smart plug or other power monitor, running while it draws power",
+                    "found": "Set up every appliance found and not yet set up, all with the same settings"
+                }
+            },
+            "power": {
+                "title": "Power Monitored Appliance",
+                "description": "The appliance starts when its power goes above the threshold, and ends once it has stayed at or below it for the grace period.",
+                "data": {
+                    "name": "Appliance name",
+                    "power_entity": "Power sensor",
+                    "threshold": "Power threshold",
+                    "grace_period": "Grace period"
+                },
+                "data_description": {
+                    "name": "Used in notifications, and to choose an icon",
+                    "power_entity": "The sensor measuring the power drawn by the appliance",
+                    "threshold": "The appliance is running while it draws more than this",
+                    "grace_period": "How long the power must stay at or below the threshold before the cycle is over, so short drop outs are ignored"
+                }
+            },
+            "found": {
+                "title": "Appliance notifications",
                 "description": "These settings are used for every appliance found: **{name}**. Each is set up separately, so can be changed or disabled afterwards.\n\n{supernotify}\n\n`{placeholder}` is replaced by the name of the appliance. Clear a title or message to go back to its default.",
                 "data": {
                     "start_title": "Start title",
@@ -72,6 +100,20 @@
                     "target": "Who or what to notify, as for any Supernotify notification. Leave empty for Supernotify to choose.",
                     "custom_target": "Targets outside of Home Assistant, such as e-mail addresses or phone numbers.",
                     "deliveries": "Limit notifications to these Supernotify deliveries. Leave empty for Supernotify to choose."
+                }
+            },
+            "power": {
+                "title": "Power monitoring for {name}",
+                "description": "The appliance starts when its power goes above the threshold, and ends once it has stayed at or below it for the grace period.",
+                "data": {
+                    "power_entity": "Power sensor",
+                    "threshold": "Power threshold",
+                    "grace_period": "Grace period"
+                },
+                "data_description": {
+                    "power_entity": "The sensor measuring the power drawn by the appliance",
+                    "threshold": "The appliance is running while it draws more than this",
+                    "grace_period": "How long the power must stay at or below the threshold before the cycle is over, so short drop outs are ignored"
                 }
             }
         },
