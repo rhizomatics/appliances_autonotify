@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "ha-repl": {
+      "source": "rhizomatics/homeassistant-repl",
+      "sourceType": "github",
+      "skillPath": "skills/ha-repl/SKILL.md",
+      "computedHash": "c5d16b32b823b00469bda41f8493c22300d93e98a0c1b157a75ea86b88fbe3cb"
+    }
+  }
+}
