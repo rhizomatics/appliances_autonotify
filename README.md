@@ -1,4 +1,4 @@
-# Appliances SuperNotifications
+# Appliance Auto Notifier
 
 Automatic notifications for household appliances in Home Assistant, with no automations or YAML.
 
@@ -16,13 +16,14 @@ in English only. Any other appliance can be added by hand if it has a power moni
 - An appliance set up with the Home Connect integration, or one with a power sensor
 - [Supernotify](https://supernotify.rhizomatics.org.uk), installed from HACS, for Live Activities and for anything
   beyond a plain notification
+- Home Assistant app installed on an Apple mobile device, minimum iOS/iPadOS 17.2
 
 Without Supernotify, it only sends a start and an end notification, to notify entities you choose.
 
 ## Install
 
 1. In HACS, add `https://github.com/rhizomatics/appliances_supernotifications` as a custom repository of type
-   *Integration*, install *Appliances SuperNotifications* and restart Home Assistant
+   *Integration*, install *Appliance Auto Notifier* and restart Home Assistant
 
 Home Connect appliances are offered automatically as *Discovered* on the *Devices & services* page, including
 appliances you add later. Choose *Add* to set one up, or *Ignore* on any you don't want.
@@ -31,7 +32,7 @@ appliances you add later. Choose *Add* to set one up, or *Ignore* on any you don
 
 An appliance with no supported integration can be added if a sensor measures the power it draws.
 
-1. In *Settings*, *Devices & services*, choose *Add integration* and pick *Appliances SuperNotifications*
+1. In *Settings*, *Devices & services*, choose *Add integration* and pick *Appliance Auto Notifier*
 2. Choose *Power Monitored Appliance*
 3. Give the appliance a name, and choose its power sensor
 4. Optionally change the notification settings
@@ -82,5 +83,5 @@ counts as finished.
 uv sync
 uv run pytest
 uv run ruff check --fix && uv run ruff format
-uv run mypy custom_components/appliances_supernotifications
+uv run mypy custom_components/appliance_auto_notifier
 ```

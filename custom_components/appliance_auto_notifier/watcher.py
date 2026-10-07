@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import TYPE_CHECKING, Any
 
@@ -70,6 +71,8 @@ class ApplianceWatcher:
         self.finish_time_entity_id: str | None = None
         self.running: bool = False
         self.last_progress_step: int = 0
+        # one notification at a time, so a progress update can't overtake the end and reopen the Live Activity
+        self._sending: asyncio.Lock = asyncio.Lock()
 
     @callback
     def async_start(self) -> None:
@@ -83,38 +86,44 @@ class ApplianceWatcher:
         if step <= self.last_progress_step:
             return
         self.last_progress_step = step
-        # a Live Activity keeps the title it started with
-        await self._supernotify(
-            PROGRESS_MESSAGE.format(progress=progress),
-            self._text(CONF_START_TITLE, DEFAULT_TITLE),
-            mobile_only=True,
-            extra_data=self._live_data() | {"silent": True, "alert_once": True},
-        )
+        async with self._sending:
+            if not self.running:
+                # the cycle ended while this waited its turn
+                return
+            # a Live Activity keeps the title it started with
+            await self._supernotify(
+                PROGRESS_MESSAGE.format(progress=progress),
+                self._text(CONF_START_TITLE, DEFAULT_TITLE),
+                mobile_only=True,
+                extra_data=self._live_data() | {"silent": True, "alert_once": True},
+            )
 
     async def _started(self) -> None:
         title = self._text(CONF_START_TITLE, DEFAULT_TITLE)
         message = self._text(CONF_START_MESSAGE, DEFAULT_START_MESSAGE)
-        if supernotify_available(self.hass):
-            await self._supernotify(message, title, extra_data=self._live_data())
-        else:
-            await self._send_message(message, title)
+        async with self._sending:
+            if supernotify_available(self.hass):
+                await self._supernotify(message, title, extra_data=self._live_data())
+            else:
+                await self._send_message(message, title)
 
     async def _ended(self, finished: bool) -> None:
         title = self._text(CONF_END_TITLE, DEFAULT_TITLE)
         message = self._text(CONF_END_MESSAGE, DEFAULT_END_MESSAGE)
-        if not supernotify_available(self.hass):
+        async with self._sending:
+            if not supernotify_available(self.hass):
+                if finished:
+                    await self._send_message(message, title)
+                return
+            # closing the Live Activity is not a notification in itself, so the end is told separately
+            await self._supernotify(
+                message,
+                title,
+                mobile_only=True,
+                extra_data={"mobile_push_notification_tag": self.tag, "mobile_push_clear_notification": True},
+            )
             if finished:
-                await self._send_message(message, title)
-            return
-        # closing the Live Activity is not a notification in itself, so the end is told separately
-        await self._supernotify(
-            message,
-            title,
-            mobile_only=True,
-            extra_data={"mobile_push_notification_tag": self.tag, "mobile_push_clear_notification": True},
-        )
-        if finished:
-            await self._supernotify(message, title)
+                await self._supernotify(message, title)
 
     def _text(self, key: str, default: str) -> str:
         return str(self.entry.options.get(key) or default).replace(NAME_PLACEHOLDER, self.name)
@@ -154,6 +163,7 @@ class ApplianceWatcher:
                 mobile = (await deliveries_by_transport(self.hass)).get(MOBILE_PUSH_TRANSPORT, [])
                 deliveries = [d for d in mobile if not deliveries or d in deliveries]
                 if not deliveries:
+                    _LOGGER.warning("APPLIANCES No mobile push delivery found for %s, Live Activity not updated", self.name)
                     return
                 data["delivery_selection"] = "fixed"
                 # Supernotify's duplicate check ignores digits, so would drop progress updates as repeats

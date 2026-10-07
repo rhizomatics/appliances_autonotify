@@ -1,5 +1,5 @@
 [project]
-name = "appliances_supernotifications"
+name = "appliance_auto_notifier"
 description = "Home Assistant custom component for automatic household appliance notifications and Live Activities"
 readme = "README.md"
 version = "0.1.0"
@@ -59,7 +59,7 @@ quiet-level = 2
 asyncio_mode = "auto"
 testpaths = ["tests"]
 addopts = [
-    "--cov=custom_components.appliances_supernotifications",
+    "--cov=custom_components.appliance_auto_notifier",
     "--cov-report=term-missing",
     "--cov-fail-under=90",
 ]

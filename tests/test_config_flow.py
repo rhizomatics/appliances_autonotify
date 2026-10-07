@@ -9,7 +9,7 @@ from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers import entity_registry as er
 from homeassistant.setup import async_setup_component
 
-from custom_components.appliances_supernotifications.const import DOMAIN, SUPERNOTIFY_MISSING, SUPERNOTIFY_PRESENT
+from custom_components.appliance_auto_notifier.const import DOMAIN, SUPERNOTIFY_MISSING, SUPERNOTIFY_PRESENT
 
 from .conftest import add_appliance, mock_supernotify, setup_watcher
 
@@ -120,7 +120,7 @@ async def test_power_flow(hass: HomeAssistant) -> None:
     assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == "power"
     defaults = {str(k): k.default() for k in result["data_schema"].schema if k.default is not vol.UNDEFINED}
-    assert defaults == {"threshold": 1, "grace_period": 10}
+    assert defaults == {"threshold": 1, "grace_period": 60}
 
     power = {"power_entity": "sensor.washer_power", "threshold": 5, "grace_period": 60}
     result = await hass.config_entries.flow.async_configure(result["flow_id"], {"name": "Washer", **power})

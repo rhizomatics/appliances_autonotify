@@ -1,8 +1,8 @@
-"""Constants for Appliances SuperNotifications"""
+"""Constants for Appliance Auto Notifier"""
 
 from typing import Final
 
-DOMAIN: Final[str] = "appliances_supernotifications"
+DOMAIN: Final[str] = "appliance_auto_notifier"
 SUPERNOTIFY_DOMAIN: Final[str] = "supernotify"
 
 CONF_START_TITLE: Final[str] = "start_title"

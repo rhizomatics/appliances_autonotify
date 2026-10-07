@@ -1,15 +1,16 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import timedelta
 
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import CONF_DEVICE_ID
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.util import dt as dt_util
 from pytest_homeassistant_custom_component.common import MockConfigEntry, async_fire_time_changed, async_mock_service
 
-from custom_components.appliances_supernotifications.const import DOMAIN
+from custom_components.appliance_auto_notifier.const import DOMAIN
 
 from .conftest import add_appliance, mock_supernotify, setup_watcher
 
@@ -99,6 +100,61 @@ async def test_progress_updates_mobile_only(hass: HomeAssistant) -> None:
     assert len(calls) == 2
     await set_state(hass, appliance.progress, "20")
     assert len(calls) == 3
+
+
+async def test_progress_update_cannot_overtake_the_end(hass: HomeAssistant) -> None:
+    appliance = add_appliance(hass)
+    calls = mock_supernotify(hass)
+    await setup_watcher(hass, appliance)
+    await set_state(hass, appliance.cycle, "run")
+    assert len(calls) == 1
+
+    # hold up the progress update while it's finding the mobile deliveries
+    held = asyncio.Event()
+    release = asyncio.Event()
+
+    async def slow_enquiry(call: ServiceCall) -> dict[str, list[str]]:
+        if not held.is_set():
+            held.set()
+            await release.wait()
+        return {"mobile_push": ["mobile_push"]}
+
+    hass.services.async_register(
+        "supernotify", "enquire_implicit_deliveries", slow_enquiry, supports_response=SupportsResponse.ONLY
+    )
+    hass.states.async_set(appliance.progress, "100")
+    await held.wait()
+    hass.states.async_set(appliance.cycle, "finished")
+    await asyncio.sleep(0.05)
+    release.set()
+    await hass.async_block_till_done()
+
+    # were the update sent after the clear, the mobile app would open the Live Activity again
+    assert [bool(call.data.get("extra_data", {}).get("live_update")) for call in calls[1:]] == [True, False, False]
+    assert calls[2].data["extra_data"]["mobile_push_clear_notification"] is True
+
+
+async def test_live_activity_cleared_on_delivery_known_only_by_its_switch(hass: HomeAssistant) -> None:
+    appliance = add_appliance(hass)
+    # Delivery Control can leave the standard mobile push delivery neither implicit nor configured
+    async_mock_service(
+        hass, "supernotify", "enquire_implicit_deliveries", response={}, supports_response=SupportsResponse.ONLY
+    )
+    async_mock_service(
+        hass, "supernotify", "enquire_configuration", response={"delivery": {}}, supports_response=SupportsResponse.ONLY
+    )
+    calls = async_mock_service(hass, "supernotify", "notify")
+    hass.states.async_set(
+        "switch.supernotify_delivery_mobile_push", "on", {"name": "mobile_push", "transport": "mobile_push"}
+    )
+    hass.states.async_set("switch.supernotify_delivery_chimes", "on", {"name": "chimes", "transport": "chime"})
+    await setup_watcher(hass, appliance)
+
+    await set_state(hass, appliance.cycle, "run")
+    await set_state(hass, appliance.cycle, "finished")
+    assert len(calls) == 3
+    assert calls[1].data["delivery"] == ["mobile_push"]
+    assert calls[1].data["extra_data"]["mobile_push_clear_notification"] is True
 
 
 async def test_cycle_ends_without_finished_state(hass: HomeAssistant) -> None:
@@ -251,7 +307,7 @@ async def pass_time(hass: HomeAssistant, seconds: float) -> None:
 async def test_power_monitored_cycle(hass: HomeAssistant, freezer) -> None:
     calls = mock_supernotify(hass)
     hass.states.async_set("sensor.washer_power", "0.4", {"unit_of_measurement": "W"})
-    entry = await setup_power_watcher(hass)
+    entry = await setup_power_watcher(hass, grace_period=10)
     tag = f"appliance_{entry.entry_id}"
 
     # at the threshold isn't running
