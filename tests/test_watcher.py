@@ -71,12 +71,16 @@ async def test_progress_updates_mobile_only(hass: HomeAssistant) -> None:
     await set_state(hass, appliance.progress, "unavailable")
     await set_state(hass, appliance.cycle, "run")
     await set_state(hass, appliance.finish_time, "2026-10-06T21:44:16+00:00")
+    # the first reading is sent whatever it is, since the start had no progress to show
     await set_state(hass, appliance.progress, "4")
-    assert len(calls) == 1
+    assert len(calls) == 2
+    assert calls[1].data["extra_data"]["progress"] == 4
+    await set_state(hass, appliance.progress, "6")
+    assert len(calls) == 2
 
     await set_state(hass, appliance.progress, "12")
-    assert len(calls) == 2
-    assert calls[1].data == {
+    assert len(calls) == 3
+    assert calls[2].data == {
         "message": "12% complete",
         "title": "Dishwasher",
         "delivery_selection": "fixed",
@@ -97,9 +101,25 @@ async def test_progress_updates_mobile_only(hass: HomeAssistant) -> None:
 
     # throttled to steps of ten percent
     await set_state(hass, appliance.progress, "19")
-    assert len(calls) == 2
-    await set_state(hass, appliance.progress, "20")
     assert len(calls) == 3
+    await set_state(hass, appliance.progress, "20")
+    assert len(calls) == 4
+
+
+async def test_progress_known_at_start_is_not_repeated(hass: HomeAssistant) -> None:
+    appliance = add_appliance(hass)
+    calls = mock_supernotify(hass)
+    hass.states.async_set(appliance.progress, "0")
+    await setup_watcher(hass, appliance)
+
+    await set_state(hass, appliance.cycle, "run")
+    assert len(calls) == 1
+    assert calls[0].data["extra_data"]["progress"] == 0
+
+    await set_state(hass, appliance.progress, "4")
+    assert len(calls) == 1
+    await set_state(hass, appliance.progress, "10")
+    assert len(calls) == 2
 
 
 async def test_progress_update_cannot_overtake_the_end(hass: HomeAssistant) -> None:

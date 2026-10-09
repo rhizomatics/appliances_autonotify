@@ -232,7 +232,8 @@ class HomeConnectWatcher(ApplianceWatcher):
         _LOGGER.debug("APPLIANCES %s cycle state %s, running: %s", self.name, state, self.running)
         if state == STATE_RUN and not self.running:
             self.running = True
-            self.last_progress_step = 0
+            # with no progress yet to open the Live Activity with, the first reading is sent whatever it is
+            self.last_progress_step = -1 if self._progress() is None else 0
             await self._started()
         elif state in STATES_FINISHED and self.running:
             self.running = False
