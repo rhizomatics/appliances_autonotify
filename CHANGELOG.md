@@ -1,3 +1,9 @@
+# 0.6.0
+- *Notify start* and *Notify end* switches in the settings of each appliance, both on by default. With either off, the Live Activity is still opened and closed, silently and on phones only
+- *Notify phases* switch in the settings of an oven, on by default, for the notification that it's up to heat
+- The icon follows the type of Home Connect appliance, whatever it has been named, and is on the end notification as well as the Live Activity
+- The program an appliance is set to is used where it reports none under way, as an oven does
+- An oven warming up, on any program, has a progress bar of its temperature against the one it's set to, with "Pre-heating" or "Fast pre-heat" and both temperatures as the message. Once up to heat "Oven is pre-heated" is sent as a notification of its own, the Live Activity goes on to the program and temperature, such as "Pizza setting, 200°C", and it isn't taken to be warming up again until it has been off
 # 0.5.0
 Preparation for HACS release
 # 0.4.0

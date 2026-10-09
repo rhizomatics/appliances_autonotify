@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import timedelta
+from typing import Any
 from unittest.mock import patch
 
 from homeassistant.config_entries import ConfigEntryState
@@ -14,7 +15,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry, async_
 
 from custom_components.appliance_auto_notifier.const import DOMAIN
 
-from .conftest import add_appliance, mock_dashboards, mock_supernotify, setup_watcher
+from .conftest import DISHWASHER_PROGRAMS, add_appliance, mock_dashboards, mock_supernotify, setup_watcher
 
 
 async def set_state(hass: HomeAssistant, entity_id: str, state: str) -> None:
@@ -53,7 +54,11 @@ async def test_cycle_with_supernotify(hass: HomeAssistant) -> None:
         "delivery": ["mobile_push", "phones"],
         "extra_data": {"mobile_push_notification_tag": tag, "mobile_push_clear_notification": True},
     }
-    assert calls[2].data == {"message": "Dishwasher is finished", "title": "Dishwasher"}
+    assert calls[2].data == {
+        "message": "Dishwasher is finished",
+        "title": "Dishwasher",
+        "extra_data": {"notification_icon": "mdi:dishwasher"},
+    }
 
     # finished only once
     await set_state(hass, appliance.cycle, "inactive")
@@ -187,6 +192,276 @@ async def test_live_activity_names_the_program(hass: HomeAssistant) -> None:
     assert calls[2].data["extra_data"]["progress"] == 20
 
 
+async def test_program_chosen_is_named_when_none_is_under_way(hass: HomeAssistant) -> None:
+    # an oven reports the program it's set to, and never one under way
+    oven = add_appliance(hass, "Oven", "NEFF-2", oven=True)
+    calls = mock_supernotify(hass)
+    hass.states.async_set(oven.progress, "0")
+    hass.states.async_set(oven.program, "unknown")
+    hass.states.async_set(oven.others["selected_program"], "cooking_oven_program_heating_mode_pizza_setting")
+    await setup_watcher(hass, oven)
+    await set_state(hass, oven.cycle, "run")
+
+    key = "component.home_connect.entity.select.selected_program.state.cooking_oven_program_heating_mode_pizza_setting"
+    with patch("homeassistant.helpers.translation.async_get_cached_translations", return_value={key: "Pizza setting"}):
+        await set_state(hass, oven.progress, "10")
+    assert calls[1].data["message"] == "Pizza setting"
+
+    # the one under way is the one to go by, where there is one
+    await set_state(hass, oven.program, "cooking_oven_program_heating_mode_hot_air")
+    await set_state(hass, oven.progress, "20")
+    assert calls[2].data["message"] == "cooking_oven_program_heating_mode_hot_air"
+
+
+async def test_icon_follows_the_type_of_appliance(hass: HomeAssistant) -> None:
+    # known by its programs, whatever it has been called
+    appliance = add_appliance(hass, "Bertha", programs=DISHWASHER_PROGRAMS)
+    oven = add_appliance(hass, "Downstairs", "NEFF-2", oven=True)
+    unknown = add_appliance(hass, "Coffee machine", "BOSCH-3")
+    calls = mock_supernotify(hass)
+    for each in (appliance, oven, unknown):
+        await setup_watcher(hass, each)
+        await set_state(hass, each.cycle, "run")
+        await set_state(hass, each.cycle, "finished")
+
+    icons = [c.data["extra_data"].get("notification_icon") for c in calls]
+    # on the start and the end, the clearing of the Live Activity between them having nothing to show
+    assert icons == [
+        "mdi:dishwasher",
+        None,
+        "mdi:dishwasher",
+        "mdi:stove",
+        None,
+        "mdi:stove",
+        "mdi:coffee-maker",
+        None,
+        "mdi:coffee-maker",
+    ]
+
+
+async def test_start_and_end_notifications_switched_off(hass: HomeAssistant) -> None:
+    appliance = add_appliance(hass)
+    calls = mock_supernotify(hass)
+    entry = await setup_watcher(hass, appliance, {"notify_start": False, "notify_end": False})
+    tag = f"appliance_{entry.entry_id}"
+
+    # the Live Activity is still opened, on phones alone and without a sound
+    await set_state(hass, appliance.cycle, "run")
+    assert len(calls) == 1
+    assert calls[0].data == {
+        "message": "Dishwasher started",
+        "title": "Dishwasher",
+        "delivery_selection": "fixed",
+        "force_resend": True,
+        "delivery": ["mobile_push", "phones"],
+        "extra_data": {
+            "mobile_push_notification_tag": tag,
+            "live_update": True,
+            "notification_icon": "mdi:dishwasher",
+            "silent": True,
+            "alert_once": True,
+        },
+    }
+
+    # and still closed
+    await set_state(hass, appliance.cycle, "finished")
+    assert len(calls) == 2
+    assert calls[1].data["extra_data"] == {"mobile_push_notification_tag": tag, "mobile_push_clear_notification": True}
+
+
+async def test_start_and_end_switched_separately(hass: HomeAssistant) -> None:
+    appliance = add_appliance(hass)
+    calls = mock_supernotify(hass)
+    await setup_watcher(hass, appliance, {"notify_end": False})
+
+    await set_state(hass, appliance.cycle, "run")
+    assert "delivery_selection" not in calls[0].data
+    await set_state(hass, appliance.cycle, "finished")
+    assert len(calls) == 2
+
+
+async def test_start_and_end_switched_off_without_supernotify(hass: HomeAssistant) -> None:
+    appliance = add_appliance(hass)
+    await setup_watcher(hass, appliance, {"targets": ["notify.kitchen_display"], "notify_start": False})
+    calls = async_mock_service(hass, "notify", "send_message")
+
+    await set_state(hass, appliance.cycle, "run")
+    assert not calls
+    await set_state(hass, appliance.cycle, "finished")
+    assert [c.data["message"] for c in calls] == ["Dishwasher is finished"]
+
+
+PIZZA = "cooking_oven_program_heating_mode_pizza_setting"
+
+
+async def start_oven(
+    hass: HomeAssistant, target: str = "200", current: str = "20", options: dict[str, Any] | None = None, cycle: str = "ready"
+):
+    oven = add_appliance(hass, "Oven", "NEFF-2", oven=True)
+    calls = mock_supernotify(hass)
+    hass.states.async_set(oven.cycle, cycle)
+    # any program will do, an oven warms up for all of them
+    hass.states.async_set(oven.program, PIZZA)
+    hass.states.async_set(oven.others["setpoint_temperature"], target, {"unit_of_measurement": "°C"})
+    hass.states.async_set(oven.others["oven_current_cavity_temperature"], current, {"unit_of_measurement": "°C"})
+    # as left by the last time the oven was heated
+    hass.states.async_set(oven.others["preheat_finished"], "confirmed")
+    hass.states.async_set(oven.others["regular_preheat_finished"], "off")
+    hass.states.async_set(oven.others["fast_pre_heat"], "off")
+    entry = await setup_watcher(hass, oven, options)
+    await set_state(hass, oven.cycle, "run")
+    return oven, calls, entry
+
+
+async def set_temperature(hass: HomeAssistant, entity_id: str, temperature: str) -> None:
+    hass.states.async_set(entity_id, temperature, {"unit_of_measurement": "°C"})
+    await hass.async_block_till_done()
+
+
+async def test_oven_progress_is_its_temperature_until_up_to_heat(hass: HomeAssistant) -> None:
+    oven, calls, entry = await start_oven(hass)
+    cavity = oven.others["oven_current_cavity_temperature"]
+    # the bar starts where the oven is, a tenth of the way to its temperature
+    assert len(calls) == 1
+    assert calls[0].data["message"] == "Oven started"
+    assert calls[0].data["extra_data"]["progress"] == 10
+    assert calls[0].data["extra_data"]["progress_max"] == 100
+
+    # throttled as any other progress
+    await set_temperature(hass, cavity, "38")
+    assert len(calls) == 1
+    await set_temperature(hass, cavity, "104")
+    assert len(calls) == 2
+    assert calls[1].data["message"] == "Pre-heating, 104 of 200°C"
+    assert calls[1].data["extra_data"]["progress"] == 52
+    assert calls[1].data["extra_data"]["silent"] is True
+
+    await set_state(hass, oven.others["fast_pre_heat"], "on")
+    await set_temperature(hass, cavity, "150")
+    assert calls[2].data["message"] == "Fast pre-heat, 150 of 200°C"
+    assert calls[2].data["extra_data"]["progress"] == 75
+
+    # a lower temperature asked for moves the bar on too
+    await set_temperature(hass, oven.others["setpoint_temperature"], "170")
+    assert calls[3].data["message"] == "Fast pre-heat, 150 of 170°C"
+    assert calls[3].data["extra_data"]["progress"] == 88
+
+    # up to heat is told everywhere, in a notification of its own
+    await set_temperature(hass, cavity, "171")
+    assert len(calls) == 6
+    assert calls[4].data == {
+        "message": "Oven is pre-heated",
+        "title": "Oven",
+        "force_resend": True,
+        "extra_data": {"notification_icon": "mdi:stove"},
+    }
+    # and the Live Activity, which stays for as long as the oven is on, goes straight on to what it's now doing
+    assert calls[5].data["message"] == f"{PIZZA}, 171°C"
+    assert calls[5].data["delivery"] == ["mobile_push", "phones"]
+    assert calls[5].data["extra_data"] == {
+        "mobile_push_notification_tag": f"appliance_{entry.entry_id}",
+        "live_update": True,
+        "notification_icon": "mdi:stove",
+        "silent": True,
+        "alert_once": True,
+    }
+
+    # however the temperature then wanders, it isn't warming up again, nor told of twice
+    await set_temperature(hass, cavity, "168")
+    await set_temperature(hass, cavity, "174")
+    await set_state(hass, oven.others["regular_preheat_finished"], "present")
+    assert len(calls) == 6
+    # though the Live Activity is kept to within a few degrees of it
+    await set_temperature(hass, cavity, "160")
+    assert [c.data["message"] for c in calls[6:]] == [f"{PIZZA}, 160°C"]
+    assert calls[6].data["extra_data"]["silent"] is True
+
+    # with a timer set there's then the progress of the program to show, whatever the bar had got to
+    await set_state(hass, oven.progress, "30")
+    assert len(calls) == 8
+    assert calls[7].data["message"] == f"{PIZZA}, 160°C"
+    assert calls[7].data["extra_data"]["progress"] == 30
+
+    await set_state(hass, oven.cycle, "ready")
+    assert [c.data["message"] for c in calls[8:]] == ["Oven is finished", "Oven is finished"]
+    calls.clear()
+
+    # switched on again while warm, it has only the rest of the way to go
+    await set_state(hass, oven.progress, "unavailable")
+    await set_temperature(hass, cavity, "101")
+    await set_state(hass, oven.cycle, "run")
+    assert calls[0].data["extra_data"]["progress"] == 59
+    await set_temperature(hass, cavity, "165")
+    assert calls[1].data["message"] == "Fast pre-heat, 165 of 170°C"
+
+
+async def test_oven_is_up_to_heat_when_it_says_so(hass: HomeAssistant) -> None:
+    oven, calls, _entry = await start_oven(hass, options={"notify_phase": False})
+    await set_temperature(hass, oven.others["oven_current_cavity_temperature"], "190")
+    assert len(calls) == 2
+
+    # only as it happens, and with phases not to be told of, on the Live Activity alone
+    await set_state(hass, oven.others["preheat_finished"], "off")
+    assert len(calls) == 2
+    await set_state(hass, oven.others["preheat_finished"], "present")
+    assert len(calls) == 3
+    assert calls[2].data["message"] == f"{PIZZA}, 190°C"
+    assert calls[2].data["delivery"] == ["mobile_push", "phones"]
+    assert calls[2].data["extra_data"]["silent"] is True
+    assert "progress" not in calls[2].data["extra_data"]
+
+    await set_state(hass, oven.others["regular_preheat_finished"], "present")
+    await set_temperature(hass, oven.others["oven_current_cavity_temperature"], "193")
+    assert len(calls) == 3
+
+
+async def test_oven_already_hot_is_not_warming_up(hass: HomeAssistant) -> None:
+    oven, calls, _entry = await start_oven(hass, current="210")
+    cavity = oven.others["oven_current_cavity_temperature"]
+    assert "progress" not in calls[0].data["extra_data"]
+    # nor told of as up to heat, only shown on the Live Activity as doing what it's doing
+    await set_temperature(hass, cavity, "190")
+    await set_temperature(hass, cavity, "192")
+    await set_temperature(hass, cavity, "205")
+    assert [c.data["message"] for c in calls[1:]] == [f"{PIZZA}, 190°C", f"{PIZZA}, 205°C"]
+    assert all(c.data["extra_data"]["silent"] for c in calls[1:])
+
+
+async def test_oven_on_at_startup_is_not_warming_up(hass: HomeAssistant) -> None:
+    # there's no knowing whether it has been up to heat
+    oven, calls, _entry = await start_oven(hass, cycle="run")
+    cavity = oven.others["oven_current_cavity_temperature"]
+    await set_temperature(hass, cavity, "120")
+    await set_temperature(hass, cavity, "210")
+    await set_state(hass, oven.others["regular_preheat_finished"], "present")
+    assert [c.data["message"] for c in calls] == [f"{PIZZA}, 120°C", f"{PIZZA}, 210°C"]
+
+
+async def test_oven_temperatures_known_only_once_started(hass: HomeAssistant) -> None:
+    oven, calls, _entry = await start_oven(hass, target="unavailable")
+    cavity = oven.others["oven_current_cavity_temperature"]
+    assert "progress" not in calls[0].data["extra_data"]
+    await set_state(hass, cavity, "garbled")
+    assert len(calls) == 1
+
+    # with no timer set, an oven's own progress is of nothing
+    await set_state(hass, oven.progress, "100")
+    assert calls[1].data["extra_data"]["progress"] == 100
+
+    # the bar goes back to how far there is to go
+    await set_temperature(hass, cavity, "50")
+    await set_temperature(hass, oven.others["setpoint_temperature"], "200")
+    assert len(calls) == 3
+    assert calls[2].data["message"] == "Pre-heating, 50 of 200°C"
+    assert calls[2].data["extra_data"]["progress"] == 25
+
+    # hot enough without ever having been seen to warm up is still told of
+    hass.states.async_set(oven.others["setpoint_temperature"], "unavailable")
+    await set_temperature(hass, cavity, "220")
+    await set_temperature(hass, oven.others["setpoint_temperature"], "200")
+    assert [c.data["message"] for c in calls[3:]] == ["Oven is pre-heated", f"{PIZZA}, 220°C"]
+
+
 async def test_tap_opens_chosen_dashboard(hass: HomeAssistant) -> None:
     appliance = add_appliance(hass)
     calls = mock_supernotify(hass)
@@ -292,7 +567,7 @@ async def test_cycle_ends_without_finished_state(hass: HomeAssistant) -> None:
     await set_state(hass, appliance.cycle, "ready")
     assert len(calls) == 3
     assert calls[1].data["extra_data"]["mobile_push_clear_notification"] is True
-    assert calls[2].data == {"message": "Oven is finished", "title": "Oven"}
+    assert calls[2].data == {"message": "Oven is finished", "title": "Oven", "extra_data": {"notification_icon": "mdi:stove"}}
 
     await set_state(hass, appliance.cycle, "inactive")
     assert len(calls) == 3
@@ -485,7 +760,11 @@ async def test_power_monitored_cycle(hass: HomeAssistant, freezer) -> None:
     await pass_time(hass, 0)
     assert len(calls) == 3
     assert calls[1].data["extra_data"] == {"mobile_push_notification_tag": tag, "mobile_push_clear_notification": True}
-    assert calls[2].data == {"message": "Washer is finished", "title": "Washer"}
+    assert calls[2].data == {
+        "message": "Washer is finished",
+        "title": "Washer",
+        "extra_data": {"notification_icon": "mdi:washing-machine"},
+    }
 
     # ended only once
     await set_state(hass, "sensor.washer_power", "0")

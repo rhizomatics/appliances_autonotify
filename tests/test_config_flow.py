@@ -225,7 +225,8 @@ async def test_settings_without_supernotify(hass: HomeAssistant) -> None:
     assert result["description_placeholders"] == {"name": "Dishwasher", "supernotify": SUPERNOTIFY_MISSING}
     # everything but whether to notify progress is tucked away in three sections
     sections = {str(k): v for k, v in result["data_schema"].schema.items()}
-    assert sections.pop("notify_progress") is not None
+    for switch in ("notify_start", "notify_end", "notify_progress"):
+        assert sections.pop(switch) is not None
     assert list(sections) == ["start", "end", "notify"]
     assert all(s.options == {"collapsed": True} for s in sections.values())
     assert list(sections["notify"].schema.schema) == ["targets"]
@@ -275,8 +276,9 @@ async def test_settings_with_supernotify(hass: HomeAssistant) -> None:
     assert suggested(result)["start_title"] == "Dishwasher"
     assert suggested(result)["start_message"] == "Dishwasher is go"
     # progress isn't notified until asked for, and the choice isn't hidden away in a section
-    assert list(result["data_schema"].schema) == ["notify_progress", "start", "end", "notify"]
-    assert next(k for k in result["data_schema"].schema if k == "notify_progress").default() is False
+    assert list(result["data_schema"].schema) == ["notify_start", "notify_end", "notify_progress", "start", "end", "notify"]
+    switches = {str(k): k.default() for k in result["data_schema"].schema if k.default is not vol.UNDEFINED}
+    assert switches == {"notify_start": True, "notify_end": True, "notify_progress": False}
     notify = next(v for k, v in result["data_schema"].schema.items() if k == "notify").schema.schema
     # the notify entity list is only for use without Supernotify
     assert list(notify) == ["target", "custom_target", "deliveries"]
@@ -286,6 +288,7 @@ async def test_settings_with_supernotify(hass: HomeAssistant) -> None:
     result = await hass.config_entries.options.async_configure(
         result["flow_id"],
         {
+            "notify_start": False,
             "notify_progress": True,
             "start": {"start_title": "Dishwasher", "start_message": "Dishwasher is go"},
             "end": {},
@@ -294,12 +297,53 @@ async def test_settings_with_supernotify(hass: HomeAssistant) -> None:
     )
     assert result["type"] is FlowResultType.CREATE_ENTRY
     await hass.async_block_till_done()
-    assert entry.options == {"notify_progress": True, "start_message": "Dishwasher is go", **settings}
+    # a switch is only kept once it's been changed
+    assert entry.options == {"notify_start": False, "notify_progress": True, "start_message": "Dishwasher is go", **settings}
     assert entry.runtime_data.notify_progress is True
+    assert (entry.runtime_data.notify_start, entry.runtime_data.notify_end) == (False, True)
     result = await hass.config_entries.options.async_init(entry.entry_id)
     assert suggested(result)["notify_progress"] is True
+    assert suggested(result)["notify_start"] is False
+    assert "notify_end" not in suggested(result)
     assert suggested(result)["target"] == {"entity_id": ["person.joe"]}
     assert suggested(result)["deliveries"] == ["phones"]
+
+
+async def test_phases_are_notified_for_an_oven_unless_turned_off(hass: HomeAssistant) -> None:
+    mock_supernotify(hass)
+    oven = add_appliance(hass, "Oven", "NEFF-2", oven=True)
+    entry = await setup_watcher(hass, oven)
+    assert entry.runtime_data.notify_phase is True
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    assert list(result["data_schema"].schema)[:4] == ["notify_start", "notify_end", "notify_phase", "notify_progress"]
+    assert next(k for k in result["data_schema"].schema if k == "notify_phase").default() is True
+
+    # left as it comes it isn't a setting, turned off it is
+    form = {"start": {}, "end": {}, "notify": {}}
+    result = await hass.config_entries.options.async_configure(result["flow_id"], form)
+    await hass.async_block_till_done()
+    assert entry.options == {}
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(result["flow_id"], form | {"notify_phase": False})
+    await hass.async_block_till_done()
+    assert entry.options == {"notify_phase": False}
+    assert entry.runtime_data.notify_phase is False
+
+    # something with the temperatures of an oven that isn't one has phases only if asked for
+    other = add_appliance(hass, "Warmer", "BOSCH-4", programs=["cooking_hob_program_power_mode"], oven=True)
+    entry = await setup_watcher(hass, other)
+    assert entry.runtime_data.notify_phase is False
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    assert next(k for k in result["data_schema"].schema if k == "notify_phase").default() is False
+    result = await hass.config_entries.options.async_configure(result["flow_id"], form | {"notify_phase": True})
+    await hass.async_block_till_done()
+    assert entry.options == {"notify_phase": True}
+
+    # and an appliance that reports none has no switch for them
+    entry = await setup_watcher(hass, add_appliance(hass))
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    assert "notify_phase" not in result["data_schema"].schema
 
 
 async def test_dashboard_is_chosen_from_those_there_are(hass: HomeAssistant) -> None:

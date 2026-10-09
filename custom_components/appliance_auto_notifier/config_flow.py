@@ -33,7 +33,10 @@ from .const import (
     CONF_END_MESSAGE,
     CONF_END_TITLE,
     CONF_GRACE_PERIOD,
+    CONF_NOTIFY_END,
+    CONF_NOTIFY_PHASE,
     CONF_NOTIFY_PROGRESS,
+    CONF_NOTIFY_START,
     CONF_POWER_ENTITY,
     CONF_START_MESSAGE,
     CONF_START_TITLE,
@@ -64,6 +67,9 @@ SECTION_START = "start"
 SECTION_END = "end"
 SECTION_NOTIFY = "notify"
 
+# a switch left as it comes isn't a setting either
+DEFAULT_SWITCHES: dict[str, bool] = {CONF_NOTIFY_START: True, CONF_NOTIFY_END: True, CONF_NOTIFY_PROGRESS: False}
+
 DEFAULT_TEXTS: dict[str, str] = {
     CONF_START_TITLE: DEFAULT_TITLE,
     CONF_START_MESSAGE: DEFAULT_START_MESSAGE,
@@ -80,8 +86,14 @@ def discovery_schema(auto_discover: bool = True) -> vol.Schema:
     return vol.Schema({vol.Required(CONF_AUTO_DISCOVER, default=auto_discover): BooleanSelector()})
 
 
-async def settings_schema(hass: HomeAssistant, progress: bool = True) -> vol.Schema:
-    fields: dict[vol.Marker, Any] = {}
+async def settings_schema(hass: HomeAssistant, progress: bool = True, phase: bool | None = None) -> vol.Schema:
+    fields: dict[vol.Marker, Any] = {
+        vol.Required(CONF_NOTIFY_START, default=True): BooleanSelector(),
+        vol.Required(CONF_NOTIFY_END, default=True): BooleanSelector(),
+    }
+    if phase is not None:
+        # only for an appliance with phases, and on or off to begin with by how much they matter for its type
+        fields[vol.Required(CONF_NOTIFY_PHASE, default=phase)] = BooleanSelector()
     if progress:
         fields[vol.Required(CONF_NOTIFY_PROGRESS, default=False)] = BooleanSelector()
     notify: dict[vol.Marker, Any] = {}
@@ -230,6 +242,9 @@ class AppliancesOptionsFlow(OptionsFlowWithReload):
         watcher = getattr(self.config_entry, "runtime_data", None)
         return watcher.name if watcher is not None else self.config_entry.title
 
+    def _phase_default(self) -> bool | None:
+        return getattr(getattr(self.config_entry, "runtime_data", None), "phase_default", None)
+
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         if self.config_entry.data.get(CONF_TYPE) == TYPE_DISCOVERY:
             return await self.async_step_discovery()
@@ -249,13 +264,20 @@ class AppliancesOptionsFlow(OptionsFlowWithReload):
         defaults = {key: text.replace(NAME_PLACEHOLDER, name) for key, text in DEFAULT_TEXTS.items()}
         if user_input is not None:
             # text left as the default isn't a setting, so it goes on following the name of the appliance
-            settings = {key: value for key, value in flattened(user_input).items() if value and value != defaults.get(key)}
+            unset = defaults | DEFAULT_SWITCHES | {CONF_NOTIFY_PHASE: self._phase_default()}
+            settings = {
+                key: value
+                for key, value in flattened(user_input).items()
+                if (value or value is False) and value != unset.get(key)
+            }
             if self.config_entry.data.get(CONF_TYPE) == TYPE_POWER:
                 self._settings = settings
                 return await self.async_step_power()
             return self.async_create_entry(data=settings)
         # a power monitored appliance has no progress to report
-        schema = await settings_schema(self.hass, progress=self.config_entry.data.get(CONF_TYPE) != TYPE_POWER)
+        schema = await settings_schema(
+            self.hass, progress=self.config_entry.data.get(CONF_TYPE) != TYPE_POWER, phase=self._phase_default()
+        )
         shown = dict(self.config_entry.options)
         if shown.get(CONF_DASHBOARD) not in dashboards(self.hass):
             # removed since it was chosen

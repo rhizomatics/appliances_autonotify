@@ -62,9 +62,12 @@ Raise the grace period for appliances that pause mid-cycle, such as a washing ma
 
 ## Settings
 
-Nothing needs changing for notifications to work. Each appliance on the integration's page has settings: a
-*Notify progress* switch, off by default, with Supernotify a *Dashboard to open* when a notification or the Live
-Activity is tapped, and then three sections that start closed. The dashboard is a choice of those in Home Assistant,
+Nothing needs changing for notifications to work. Each appliance on the integration's page has settings: *Notify
+start* and *Notify end* switches, both on by default, for an oven a *Notify phases* switch, also on by default,
+a *Notify progress* switch, off by default, with Supernotify
+a *Dashboard to open* when a notification or the Live Activity is tapped, and then three sections that start closed.
+With *Notify start* or *Notify end* off, that notification isn't sent, but the Live Activity is still opened and
+closed, silently and on phones only. The dashboard is a choice of those in Home Assistant,
 never a URL to type in, so a notification can't be made to open anything else.
 
 | Section              | What it does                                                                                 |
@@ -77,20 +80,45 @@ never a URL to type in, so a notification can't be made to open anything else.
 
 | When                                   | With Supernotify                                                    | Without             |
 | -------------------------------------- | ------------------------------------------------------------------- | ------------------- |
-| Cycle starts                           | Start notification everywhere, opening a Live Activity on phones     | Start notification  |
+| Cycle starts                           | Start notification everywhere, opening a Live Activity on phones. With *Notify start* off, only the Live Activity, opened silently | Start notification, unless *Notify start* is off |
 | Every 10% of progress                  | Silent update of the Live Activity, on phones only, with the program under way as its message, such as "Eco 50ºC". With *Notify progress* on, a notification everywhere instead, which updates the Live Activity too | Nothing, or with *Notify progress* on, a notification |
 | Every 2% of progress, from 90%         | Silent update of the Live Activity, on phones only                  | Nothing             |
-| Cycle finishes                         | Live Activity closed, then an end notification everywhere           | End notification    |
+| Oven warming up                        | Silent update of the Live Activity as the oven warms, see below      | Nothing, or with *Notify progress* on, a notification |
+| Oven up to heat                        | "Oven is pre-heated" everywhere, unless *Notify phases* is off       | The same notification, unless *Notify phases* is off |
+| Cycle finishes                         | Live Activity closed, then an end notification everywhere, unless *Notify end* is off | End notification, unless *Notify end* is off |
 | Cycle is aborted, or fails             | Live Activity closed, with no end notification                      | Nothing             |
 
 Pausing and resuming an appliance counts as the same cycle. An appliance that is switched off, like an oven,
 counts as finished.
 
+### Oven Pre-heating
+
+An oven with no timer set has no progress to report, so while it warms up, on any program, the bar is its
+temperature as a percentage of the one it's set to, and the message is the two of them, such as "Pre-heating,
+150 of 200°C", or "Fast pre-heat" in place of "Pre-heating" while that is on.
+
+Once the oven is as hot as asked for, or reports that pre-heating is finished, "Oven is pre-heated" is sent
+everywhere as a notification of its own, unless *Notify phases* is off. The Live Activity stays until the oven is
+switched off, and goes straight on to the program and the temperature, such as "Pizza setting, 200°C", updated
+whenever the temperature has moved by 5 degrees. From then on the oven isn't taken to be warming up again,
+however its temperature wanders, until it has been off. With a timer set, the bar then goes on to the progress
+of the program.
+
+### Icons
+
+The icon of a notification follows the type of appliance: dishwasher, washer, dryer, washer dryer, oven, hob, hood,
+coffee maker, cleaning robot or air conditioner. A power monitored appliance has none to go by, so its name is
+used instead, as in "Washer" or "Kettle".
+
 ## Known Limits
+
+- Pre-heating is the only phase of a cycle there is to tell of, since Home Connect reports none for a dishwasher or washer, such as pre-wash or rinse
 
 - If the appliance never reports the end of its cycle, the Live Activity stays on the phone until dismissed
 - If Home Assistant restarts mid-cycle, the end is still notified and the Live Activity closed
 - Progress, time remaining and the program are only shown where the appliance reports them, so never for a power monitored appliance
+- If Home Assistant restarts while an oven is on, it isn't shown as pre-heating, since there's no knowing whether it has been up to heat, only with its program and temperature
+- An oven with no timer set reports its progress as 100%, so that is what the bar shows once it's up to heat
 
 ## Known Issues
 

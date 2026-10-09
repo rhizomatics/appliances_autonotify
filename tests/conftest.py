@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from types import SimpleNamespace
 from typing import Any
 
@@ -27,9 +27,29 @@ class FakeAppliance:
     progress: str
     finish_time: str
     program: str
+    # by translation key, those that only some appliances have
+    others: dict[str, str] = field(default_factory=dict)
 
 
-def add_appliance(hass: HomeAssistant, name: str = "Dishwasher", ha_id: str = "BOSCH-1") -> FakeAppliance:
+DISHWASHER_PROGRAMS = ["dishcare_dishwasher_program_eco_50", "dishcare_dishwasher_program_auto_2"]
+OVEN_PROGRAMS = ["cooking_oven_program_heating_mode_pre_heating", "cooking_oven_program_heating_mode_pizza_setting"]
+OVEN_ENTITIES = {
+    "selected_program": "select",
+    "setpoint_temperature": "number",
+    "oven_current_cavity_temperature": "sensor",
+    "preheat_finished": "sensor",
+    "regular_preheat_finished": "sensor",
+    "fast_pre_heat": "switch",
+}
+
+
+def add_appliance(
+    hass: HomeAssistant,
+    name: str = "Dishwasher",
+    ha_id: str = "BOSCH-1",
+    programs: list[str] | None = None,
+    oven: bool = False,
+) -> FakeAppliance:
     """Register a Home Connect appliance as the core integration would"""
     source = MockConfigEntry(domain="home_connect", entry_id=f"hc_{ha_id}")
     source.add_to_hass(hass)
@@ -38,15 +58,21 @@ def add_appliance(hass: HomeAssistant, name: str = "Dishwasher", ha_id: str = "B
     )
     entity_registry = er.async_get(hass)
     entity_ids: dict[str, str] = {}
-    for key in ("operation_state", "program_progress", "program_finish_time", "active_program"):
+    domains = dict.fromkeys(("operation_state", "program_progress", "program_finish_time"), "sensor")
+    domains["active_program"] = "select"
+    if oven:
+        domains |= OVEN_ENTITIES
+        programs = OVEN_PROGRAMS if programs is None else programs
+    for key, domain in domains.items():
         entity_ids[key] = entity_registry.async_get_or_create(
-            "select" if key == "active_program" else "sensor",
+            domain,
             "home_connect",
             f"{ha_id}-{key}",
             suggested_object_id=f"{name.lower()}_{key}",
             device_id=device.id,
             config_entry=source,
             translation_key=key,
+            capabilities={"options": programs} if domain == "select" and programs else None,
         ).entity_id
     return FakeAppliance(
         device.id,
@@ -54,6 +80,7 @@ def add_appliance(hass: HomeAssistant, name: str = "Dishwasher", ha_id: str = "B
         entity_ids["program_progress"],
         entity_ids["program_finish_time"],
         entity_ids["active_program"],
+        {key: entity_ids[key] for key in OVEN_ENTITIES if key in entity_ids},
     )
 
 

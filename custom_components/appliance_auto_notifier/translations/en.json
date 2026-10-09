@@ -54,10 +54,16 @@
                 "title": "Notifications for {name}",
                 "description": "Everything here is optional.\n\n{supernotify}",
                 "data": {
+                    "notify_start": "Notify start",
+                    "notify_end": "Notify end",
+                    "notify_phase": "Notify phases",
                     "notify_progress": "Notify progress",
                     "dashboard": "Dashboard to open"
                 },
                 "data_description": {
+                    "notify_start": "Send a notification when the appliance starts. When off, the Live Activity is still opened, silently and on phones only.",
+                    "notify_end": "Send a notification when the appliance finishes. When off, the Live Activity is still closed.",
+                    "notify_phase": "Send a notification when a phase of the cycle is over, such as an oven getting up to heat. When off, it is only shown on the Live Activity.",
                     "dashboard": "Opened when a notification or the Live Activity is tapped. Leave empty to open the app where it was.",
                     "notify_progress": "Send a notification every 10% of the cycle. When off, progress is only shown on the progress bar of the Live Activity, which is updated silently."
                 },
