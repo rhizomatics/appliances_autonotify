@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
-  <title>Appliance Auto Notifier, for light themes</title>
-  <!-- shared by every auto notifier: the tile, and the progress bar along the bottom -->
+  <title>Appliance AutoNotify, for light themes</title>
+  <!-- shared by every AutoNotify: the tile, and the progress bar along the bottom -->
   <rect width="512" height="512" rx="112" fill="#E4EDF2"/>
   <rect x="64" y="380" width="384" height="48" rx="24" fill="#16313F" fill-opacity="0.15"/>
   <rect x="64" y="380" width="250" height="48" rx="24" fill="#FFB300"/>

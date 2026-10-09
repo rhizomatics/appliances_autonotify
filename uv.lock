@@ -263,8 +263,8 @@ wheels = [
 ]
 
 [[package]]
-name = "appliance-auto-notifier"
-version = "0.6.0"
+name = "appliance-autonotify
+version = "0.6.1"
 source = { virtual = "." }
 dependencies = [
     { name = "homeassistant" },

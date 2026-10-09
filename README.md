@@ -1,4 +1,4 @@
-# Appliance Auto Notifier
+# Appliance Auto Notify
 
 [![CI](https://github.com/rhizomatics/appliances_autonotify/actions/workflows/ci.yml/badge.svg)](https://github.com/rhizomatics/appliances_autonotify/actions/workflows/ci.yml)
 [![Github Deploy](https://github.com/rhizomatics/appliances_autonotify/actions/workflows/deploy.yml/badge.svg?branch=main)](https://github.com/rhizomatics/appliances_autonotify/actions/workflows/deploy.yml)
@@ -33,8 +33,8 @@ unless you choose other notify entities.
 [![Open in HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=rhizomatics&repository=appliances_autonotify&category=integration)
 
 1. Use the button above, or in HACS add `https://github.com/rhizomatics/appliances_autonotify` as a custom
-   repository of type *Integration*, then install *Appliance Auto Notifier* and restart Home Assistant
-2. In *Settings*, *Devices & services*, choose *Add integration* and pick *Appliance Auto Notifier*
+   repository of type *Integration*, then install *Appliance Auto Notify* and restart Home Assistant
+2. In *Settings*, *Devices & services*, choose *Add integration* and pick *Appliance Auto Notify*
 3. Leave *Set up appliances automatically* on, and submit
 
 That's all. Every Home Connect appliance is set up straight away, and so is any you add later. Each is listed on

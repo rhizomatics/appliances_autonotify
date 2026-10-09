@@ -1,4 +1,4 @@
-"""Constants for Appliance Auto Notifier"""
+"""Constants for Appliance Auto Notify"""
 
 from typing import Final
 

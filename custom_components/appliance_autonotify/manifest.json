@@ -1,6 +1,6 @@
 {
     "domain": "appliance_autonotify",
-    "name": "Appliance Autonotify",
+    "name": "Appliance Auto Notify",
     "after_dependencies": [
         "home_connect",
         "supernotify"

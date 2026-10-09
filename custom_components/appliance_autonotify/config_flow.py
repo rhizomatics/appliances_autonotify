@@ -1,4 +1,4 @@
-"""Config flow for Appliance Auto Notifier, one config entry per appliance"""
+"""Config flow for Appliance Auto Notify, one config entry per appliance"""
 
 from __future__ import annotations
 
