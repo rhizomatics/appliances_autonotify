@@ -3,6 +3,8 @@ __pycache__/
 .venv/
 .coverage
 cov.xml
+coverage.xml
+badges/
 htmlcov/
 .mypy_cache/
 .pytest_cache/

@@ -20,7 +20,8 @@ dev = [
     "codespell",
     "mypy",
     "voluptuous-stubs>=0.1.1",
-    "homeassistant-repl"
+    "homeassistant-repl",
+    "genbadge[all]",
 ]
 
 [tool.uv]
@@ -53,7 +54,7 @@ preview = true
 
 [tool.codespell]
 ignore-words-list = "hass"
-skip = "*.json,./.*,./htmlcov"
+skip = "*.json,./.*,./htmlcov,./junit,cov.xml,coverage.xml,uv.lock"
 quiet-level = 2
 
 [tool.pytest.ini_options]
@@ -61,6 +62,8 @@ asyncio_mode = "auto"
 testpaths = ["tests"]
 addopts = [
     "--cov=custom_components.appliance_auto_notifier",
+    "--cov-report=xml:cov.xml",
+    "--cov-report=html",
     "--cov-report=term-missing",
     "--cov-fail-under=90",
 ]
