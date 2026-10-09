@@ -23,7 +23,7 @@ jobs:
     - uses: actions/checkout@v7.0.1
     - name: Package release zip
       run: |
-        cd custom_components/appliance_auto_notifier
+        cd custom_components/appliance_autonotify
         zip -r "${{ github.workspace }}/appliances_autonotify.zip" . -x "__pycache__/*" "*/__pycache__/*"
     - name: Upload release zip asset
       env:
@@ -65,7 +65,7 @@ jobs:
       run: uv run ruff format --check custom_components tests
     - name: Test with pytest
       run: |
-        uv run pytest . --junitxml=junit/test-results-${{ matrix.python-version }}.xml --cov=custom_components.appliance_auto_notifier --cov-report=xml --cov-report=html
+        uv run pytest . --junitxml=junit/test-results-${{ matrix.python-version }}.xml --cov=custom_components.appliance_autonotify --cov-report=xml --cov-report=html
     - name: Generate badges
       # the tests of a pull request aren't those of main, and a release has nothing new to show
       if: github.event_name == 'push'

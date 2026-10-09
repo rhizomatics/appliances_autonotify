@@ -13,7 +13,7 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.util import dt as dt_util
 from pytest_homeassistant_custom_component.common import MockConfigEntry, async_fire_time_changed, async_mock_service
 
-from custom_components.appliance_auto_notifier.const import DOMAIN
+from custom_components.appliance_autonotify.const import DOMAIN
 
 from .conftest import DISHWASHER_PROGRAMS, add_appliance, mock_dashboards, mock_supernotify, setup_watcher
 

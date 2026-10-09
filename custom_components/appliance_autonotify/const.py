@@ -2,7 +2,7 @@
 
 from typing import Final
 
-DOMAIN: Final[str] = "appliance_auto_notifier"
+DOMAIN: Final[str] = "appliance_autonotify"
 SUPERNOTIFY_DOMAIN: Final[str] = "supernotify"
 
 CONF_START_TITLE: Final[str] = "start_title"

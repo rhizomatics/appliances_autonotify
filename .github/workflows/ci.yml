@@ -52,7 +52,7 @@ jobs:
         run: uv run codespell
 
       - name: mypy
-        run: uv run mypy custom_components/appliance_auto_notifier
+        run: uv run mypy custom_components/appliance_autonotify
 
       - name: pytest
         run: uv run pytest

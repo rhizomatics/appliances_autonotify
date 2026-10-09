@@ -154,5 +154,5 @@ dimmed or always-on, so drops the seconds. This is also a theory, and nothing ha
 uv sync
 uv run pytest
 uv run ruff check --fix && uv run ruff format
-uv run mypy custom_components/appliance_auto_notifier
+uv run mypy custom_components/appliance_autonotify
 ```

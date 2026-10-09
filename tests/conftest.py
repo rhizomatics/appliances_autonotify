@@ -12,7 +12,7 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.setup import async_setup_component
 from pytest_homeassistant_custom_component.common import MockConfigEntry, async_mock_service
 
-from custom_components.appliance_auto_notifier.const import DOMAIN
+from custom_components.appliance_autonotify.const import DOMAIN
 
 
 @pytest.fixture(autouse=True)
