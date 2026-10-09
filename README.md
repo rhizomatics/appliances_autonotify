@@ -1,5 +1,6 @@
 # Appliance Auto Notify
 
+[![Rhizomatics Open Source](https://img.shields.io/badge/rhizomatics%20open%20source-lightseagreen)](https://github.com/rhizomatics) [![hacs][hacsbadge]][hacs]
 [![CI](https://github.com/rhizomatics/appliances_autonotify/actions/workflows/ci.yml/badge.svg)](https://github.com/rhizomatics/appliances_autonotify/actions/workflows/ci.yml)
 [![Github Deploy](https://github.com/rhizomatics/appliances_autonotify/actions/workflows/deploy.yml/badge.svg?branch=main)](https://github.com/rhizomatics/appliances_autonotify/actions/workflows/deploy.yml)
 ![Coverage](https://raw.githubusercontent.com/rhizomatics/appliances_autonotify/refs/heads/badges/badges/coverage.svg)
@@ -156,3 +157,6 @@ uv run pytest
 uv run ruff check --fix && uv run ruff format
 uv run mypy custom_components/appliance_autonotify
 ```
+
+[hacs]: https://hacs.xyz
+[hacsbadge]: https://img.shields.io/badge/HACS-Default-blue.svg
