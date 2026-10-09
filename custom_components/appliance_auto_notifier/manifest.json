@@ -1,6 +1,6 @@
 {
-    "domain": "appliance_auto_notifier",
-    "name": "Appliance Auto Notifier",
+    "domain": "appliance_autonotify",
+    "name": "Appliance Autonotify",
     "after_dependencies": [
         "home_connect",
         "supernotify"
@@ -17,5 +17,5 @@
     "iot_class": "calculated",
     "issue_tracker": "https://github.com/rhizomatics/appliances_autonotify/issues",
     "requirements": [],
-    "version": "0.6.0"
+    "version": "0.6.1"
 }

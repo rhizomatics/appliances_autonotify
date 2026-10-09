@@ -1,3 +1,6 @@
+# 0.6.1
+Package naming consistency and auto build
+
 # 0.6.0
 - *Notify start* and *Notify end* switches in the settings of each appliance, both on by default. With either off, the Live Activity is still opened and closed, silently and on phones only
 - *Notify phases* switch in the settings of an oven, on by default, for the notification that it's up to heat

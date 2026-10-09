@@ -320,7 +320,7 @@ async def test_phases_are_notified_for_an_oven_unless_turned_off(hass: HomeAssis
     assert next(k for k in result["data_schema"].schema if k == "notify_phase").default() is True
 
     # left as it comes it isn't a setting, turned off it is
-    form = {"start": {}, "end": {}, "notify": {}}
+    form: dict[str, dict[str, Any]] = {"start": {}, "end": {}, "notify": {}}
     result = await hass.config_entries.options.async_configure(result["flow_id"], form)
     await hass.async_block_till_done()
     assert entry.options == {}
