@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+import pytest
 import voluptuous as vol
 from homeassistant.config_entries import (
     SOURCE_INTEGRATION_DISCOVERY,
@@ -11,13 +12,13 @@ from homeassistant.config_entries import (
     ConfigFlowResult,
 )
 from homeassistant.core import HomeAssistant
-from homeassistant.data_entry_flow import FlowResultType
+from homeassistant.data_entry_flow import FlowResultType, InvalidData
 from homeassistant.helpers import entity_registry as er
 from homeassistant.setup import async_setup_component
 
 from custom_components.appliance_auto_notifier.const import DOMAIN, SUPERNOTIFY_MISSING, SUPERNOTIFY_PRESENT
 
-from .conftest import add_appliance, mock_supernotify, setup_watcher
+from .conftest import add_appliance, mock_dashboard, mock_dashboards, mock_supernotify, setup_watcher
 
 
 async def start_discovery(hass: HomeAssistant, auto_discover: bool = True) -> ConfigEntry:
@@ -299,6 +300,53 @@ async def test_settings_with_supernotify(hass: HomeAssistant) -> None:
     assert suggested(result)["notify_progress"] is True
     assert suggested(result)["target"] == {"entity_id": ["person.joe"]}
     assert suggested(result)["deliveries"] == ["phones"]
+
+
+async def test_dashboard_is_chosen_from_those_there_are(hass: HomeAssistant) -> None:
+    appliance = add_appliance(hass)
+    mock_supernotify(hass)
+    mock_dashboards(hass)
+    # as chosen before the dashboard was removed
+    entry = await setup_watcher(hass, appliance, {"dashboard": "dashboard-garage"})
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    dashboard = next(v for k, v in result["data_schema"].schema.items() if k == "dashboard")
+    assert dashboard.config["options"] == [
+        {"value": "dashboard-kitchen", "label": "Kitchen"},
+        {"value": "lovelace", "label": "Overview"},
+    ]
+    assert not dashboard.config.get("custom_value")
+    assert "dashboard" not in suggested(result)
+
+    choice = {"dashboard": "dashboard-kitchen", "start": {}, "end": {}, "notify": {}}
+    result = await hass.config_entries.options.async_configure(result["flow_id"], choice)
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    await hass.async_block_till_done()
+    assert entry.options == {"dashboard": "dashboard-kitchen"}
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    assert suggested(result)["dashboard"] == "dashboard-kitchen"
+
+    # anything else is turned away
+    with pytest.raises(InvalidData):
+        await hass.config_entries.options.async_configure(result["flow_id"], choice | {"dashboard": "https://example.com"})
+
+
+async def test_dashboards_with_the_same_title_are_told_apart(hass: HomeAssistant) -> None:
+    appliance = add_appliance(hass)
+    mock_supernotify(hass)
+    mock_dashboards(hass)
+    mock_dashboard(hass, "dashboard-supernotify", "Supernotify")
+    mock_dashboard(hass, "dashboard-supernotify-2", "SuperNotify")
+    entry = await setup_watcher(hass, appliance)
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    dashboard = next(v for k, v in result["data_schema"].schema.items() if k == "dashboard")
+    assert [option["label"] for option in dashboard.config["options"]] == [
+        "Kitchen",
+        "Overview",
+        "Supernotify (dashboard-supernotify)",
+        "SuperNotify (dashboard-supernotify-2)",
+    ]
 
 
 async def test_setup_without_entries(hass: HomeAssistant) -> None:

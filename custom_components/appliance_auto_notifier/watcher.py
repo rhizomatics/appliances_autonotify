@@ -6,17 +6,26 @@ import asyncio
 import logging
 from typing import TYPE_CHECKING, Any
 
-from homeassistant.const import ATTR_ENTITY_ID, ATTR_UNIT_OF_MEASUREMENT, CONF_DEVICE_ID, UnitOfPower
+from homeassistant.const import (
+    ATTR_ENTITY_ID,
+    ATTR_UNIT_OF_MEASUREMENT,
+    CONF_DEVICE_ID,
+    STATE_UNAVAILABLE,
+    STATE_UNKNOWN,
+    UnitOfPower,
+)
 from homeassistant.core import CALLBACK_TYPE, Event, EventStateChangedData, HomeAssistant, State, callback
 from homeassistant.exceptions import ConfigEntryNotReady, HomeAssistantError
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.event import async_call_later, async_track_state_change_event
+from homeassistant.helpers.translation import async_translate_state
 from homeassistant.util import dt as dt_util
 from homeassistant.util.unit_conversion import PowerConverter
 
 from .const import (
     CONF_CUSTOM_TARGET,
+    CONF_DASHBOARD,
     CONF_DELIVERIES,
     CONF_END_MESSAGE,
     CONF_END_TITLE,
@@ -40,6 +49,9 @@ from .const import (
     MOBILE_APP_PLATFORM,
     MOBILE_PUSH_TRANSPORT,
     NAME_PLACEHOLDER,
+    PROGRAM_KEY,
+    PROGRESS_FINAL,
+    PROGRESS_FINAL_STEP,
     PROGRESS_KEY,
     PROGRESS_MESSAGE,
     PROGRESS_STEP,
@@ -49,6 +61,7 @@ from .const import (
     STATES_FINISHED,
     SUPERNOTIFY_DOMAIN,
 )
+from .dashboards import dashboard_url
 from .supernotify_api import deliveries_by_transport, supernotify_available
 
 if TYPE_CHECKING:
@@ -71,9 +84,11 @@ class ApplianceWatcher:
         self.cycle_entity_id: str | None = None
         self.progress_entity_id: str | None = None
         self.finish_time_entity_id: str | None = None
+        self.program_entity_id: str | None = None
         self.notify_progress: bool = entry.options.get(CONF_NOTIFY_PROGRESS, False)
         self.running: bool = False
-        self.last_progress_step: int = 0
+        # the progress last sent, rounded down to the step it was sent for
+        self.last_progress_mark: int = 0
         # one notification at a time, so a progress update can't overtake the end and reopen the Live Activity
         self._sending: asyncio.Lock = asyncio.Lock()
 
@@ -85,13 +100,14 @@ class ApplianceWatcher:
         progress = self._progress()
         if not self.running or progress is None:
             return
-        step = progress // PROGRESS_STEP
-        if step <= self.last_progress_step:
+        mark = progress - progress % (PROGRESS_FINAL_STEP if progress >= PROGRESS_FINAL else PROGRESS_STEP)
+        if mark <= self.last_progress_mark:
             return
-        self.last_progress_step = step
+        # the first reading only fills in the Live Activity, coming straight after the start notification, as do
+        # the smaller steps towards the end
+        ordinary = self.notify_progress and mark // PROGRESS_STEP > max(self.last_progress_mark, 0) // PROGRESS_STEP
+        self.last_progress_mark = mark
         live = supernotify_available(self.hass)
-        # the first reading only fills in the Live Activity, coming straight after the start notification
-        ordinary = self.notify_progress and step > 0
         if not live and not ordinary:
             return
         message = PROGRESS_MESSAGE.format(progress=progress)
@@ -107,8 +123,12 @@ class ApplianceWatcher:
                 # everywhere, as for the start, and updating the Live Activity on phones as it goes
                 await self._supernotify(message, title, resend=True, extra_data=self._live_data())
             else:
+                # the bar already shows how far along it is, so there's room to say what it's doing
                 await self._supernotify(
-                    message, title, mobile_only=True, extra_data=self._live_data() | {"silent": True, "alert_once": True}
+                    self._program() or message,
+                    title,
+                    mobile_only=True,
+                    extra_data=self._live_data() | {"silent": True, "alert_once": True},
                 )
 
     async def _started(self) -> None:
@@ -136,7 +156,7 @@ class ApplianceWatcher:
                 extra_data={"mobile_push_notification_tag": self.tag, "mobile_push_clear_notification": True},
             )
             if finished:
-                await self._supernotify(message, title)
+                await self._supernotify(message, title, extra_data=self._tap_data() or None)
 
     def _text(self, key: str, default: str) -> str:
         return str(self.entry.options.get(key) or default).replace(NAME_PLACEHOLDER, self.name)
@@ -148,13 +168,28 @@ class ApplianceWatcher:
         except ValueError:
             return None
 
+    def _program(self) -> str | None:
+        """The program under way as Home Assistant shows it, where the appliance reports one"""
+        state = self.hass.states.get(self.program_entity_id) if self.program_entity_id else None
+        if state is None or state.state in (STATE_UNKNOWN, STATE_UNAVAILABLE):
+            return None
+        entity = er.async_get(self.hass).async_get(state.entity_id)
+        if entity is None:
+            return state.state
+        return async_translate_state(self.hass, state.state, state.domain, entity.platform, entity.translation_key, None)
+
+    def _tap_data(self) -> dict[str, Any]:
+        """Where a tap on the notification goes, for both mobile platforms, if a dashboard has been chosen"""
+        url = dashboard_url(self.hass, self.entry.options.get(CONF_DASHBOARD))
+        return {"url": url, "clickAction": url} if url else {}
+
     def _live_data(self) -> dict[str, Any]:
         """Live Activity fields for the mobile app, leaving out whatever the appliance isn't reporting"""
         data: dict[str, Any] = {
             "mobile_push_notification_tag": self.tag,
             "live_update": True,
             "notification_icon": self.icon,
-        }
+        } | self._tap_data()
         progress = self._progress()
         if progress is not None:
             data["progress"] = progress
@@ -240,6 +275,8 @@ class HomeConnectWatcher(ApplianceWatcher):
                 self.progress_entity_id = entity.entity_id
             elif entity.translation_key == FINISH_TIME_KEY:
                 self.finish_time_entity_id = entity.entity_id
+            elif entity.translation_key == PROGRAM_KEY and entity.domain == "select":
+                self.program_entity_id = entity.entity_id
         if self.cycle_entity_id is None:
             raise ConfigEntryNotReady(f"No cycle state entity found for {self.name}")
 
@@ -262,7 +299,7 @@ class HomeConnectWatcher(ApplianceWatcher):
         if state == STATE_RUN and not self.running:
             self.running = True
             # with no progress yet to open the Live Activity with, the first reading is sent whatever it is
-            self.last_progress_step = -1 if self._progress() is None else 0
+            self.last_progress_mark = -1 if self._progress() is None else 0
             await self._started()
         elif state in STATES_FINISHED and self.running:
             self.running = False

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import timedelta
+from unittest.mock import patch
 
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import CONF_DEVICE_ID
@@ -13,7 +14,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry, async_
 
 from custom_components.appliance_auto_notifier.const import DOMAIN
 
-from .conftest import add_appliance, mock_supernotify, setup_watcher
+from .conftest import add_appliance, mock_dashboards, mock_supernotify, setup_watcher
 
 
 async def set_state(hass: HomeAssistant, entity_id: str, state: str) -> None:
@@ -149,6 +150,69 @@ async def test_progress_notified_without_supernotify(hass: HomeAssistant) -> Non
     assert len(calls) == 1
     await set_state(hass, appliance.progress, "30")
     assert [c.data["message"] for c in calls] == ["Dishwasher started", "30% complete"]
+
+
+async def test_progress_bar_updated_more_often_towards_the_end(hass: HomeAssistant) -> None:
+    appliance = add_appliance(hass)
+    calls = mock_supernotify(hass)
+    hass.states.async_set(appliance.progress, "0")
+    await setup_watcher(hass, appliance, {"notify_progress": True})
+    await set_state(hass, appliance.cycle, "run")
+
+    sent: list[tuple[int, bool]] = []
+    for progress in (80, 89, 90, 91, 92, 93, 97, 99, 100):
+        await set_state(hass, appliance.progress, str(progress))
+        sent = [(c.data["extra_data"]["progress"], "silent" in c.data["extra_data"]) for c in calls[1:]]
+    # every two percent from ninety, of which only the tens are also ordinary notifications
+    assert sent == [(80, False), (90, False), (92, True), (97, True), (99, True), (100, False)]
+
+
+async def test_live_activity_names_the_program(hass: HomeAssistant) -> None:
+    appliance = add_appliance(hass)
+    calls = mock_supernotify(hass)
+    hass.states.async_set(appliance.progress, "0")
+    await setup_watcher(hass, appliance)
+    await set_state(hass, appliance.cycle, "run")
+
+    # not yet known, so nothing to say but the progress
+    await set_state(hass, appliance.program, "unknown")
+    await set_state(hass, appliance.progress, "10")
+    assert calls[1].data["message"] == "10% complete"
+
+    await set_state(hass, appliance.program, "dishcare_dishwasher_program_eco_50")
+    key = "component.home_connect.entity.select.active_program.state.dishcare_dishwasher_program_eco_50"
+    with patch("homeassistant.helpers.translation.async_get_cached_translations", return_value={key: "Eco 50ºC"}):
+        await set_state(hass, appliance.progress, "20")
+    assert calls[2].data["message"] == "Eco 50ºC"
+    assert calls[2].data["extra_data"]["progress"] == 20
+
+
+async def test_tap_opens_chosen_dashboard(hass: HomeAssistant) -> None:
+    appliance = add_appliance(hass)
+    calls = mock_supernotify(hass)
+    mock_dashboards(hass)
+    hass.states.async_set(appliance.progress, "0")
+    await setup_watcher(hass, appliance, {"dashboard": "dashboard-kitchen"})
+
+    await set_state(hass, appliance.cycle, "run")
+    await set_state(hass, appliance.progress, "10")
+    await set_state(hass, appliance.cycle, "finished")
+    tap = {"url": "/dashboard-kitchen", "clickAction": "/dashboard-kitchen"}
+    # the start, each update of the Live Activity since iOS forgets otherwise, and the end, but not the clearing
+    assert [{k: v for k, v in c.data.get("extra_data", {}).items() if k in tap} for c in calls] == [tap, tap, {}, tap]
+
+
+async def test_tap_goes_nowhere_but_a_dashboard(hass: HomeAssistant) -> None:
+    appliance = add_appliance(hass)
+    calls = mock_supernotify(hass)
+    mock_dashboards(hass)
+    # not something the settings would save, nor a dashboard that's since been removed
+    await setup_watcher(hass, appliance, {"dashboard": "/example.com/rickroll"})
+
+    await set_state(hass, appliance.cycle, "run")
+    await set_state(hass, appliance.cycle, "finished")
+    assert len(calls) == 3
+    assert not any(key in call.data.get("extra_data", {}) for call in calls for key in ("url", "clickAction"))
 
 
 async def test_progress_known_at_start_is_not_repeated(hass: HomeAssistant) -> None:

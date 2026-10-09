@@ -16,8 +16,10 @@ from homeassistant.helpers.selector import (
     NumberSelector,
     NumberSelectorConfig,
     NumberSelectorMode,
+    SelectOptionDict,
     SelectSelector,
     SelectSelectorConfig,
+    SelectSelectorMode,
     TargetSelector,
     TextSelector,
     TextSelectorConfig,
@@ -26,6 +28,7 @@ from homeassistant.helpers.selector import (
 from .const import (
     CONF_AUTO_DISCOVER,
     CONF_CUSTOM_TARGET,
+    CONF_DASHBOARD,
     CONF_DELIVERIES,
     CONF_END_MESSAGE,
     CONF_END_TITLE,
@@ -50,6 +53,7 @@ from .const import (
     TYPE_DISCOVERY,
     TYPE_POWER,
 )
+from .dashboards import dashboards
 from .discovery import find_appliances
 from .supernotify_api import deliveries_by_transport, supernotify_available
 
@@ -82,6 +86,12 @@ async def settings_schema(hass: HomeAssistant, progress: bool = True) -> vol.Sch
         fields[vol.Required(CONF_NOTIFY_PROGRESS, default=False)] = BooleanSelector()
     notify: dict[vol.Marker, Any] = {}
     if supernotify_available(hass):
+        # a choice of what's there, and not a box to type in, so a notification can't be made to open anything else
+        choices = [SelectOptionDict(value=path, label=title) for path, title in dashboards(hass).items()]
+        if choices:
+            fields[vol.Optional(CONF_DASHBOARD)] = SelectSelector(
+                SelectSelectorConfig(options=choices, mode=SelectSelectorMode.DROPDOWN)
+            )
         # the same pair of target fields as supernotify.notify itself
         notify[vol.Optional(CONF_TARGET)] = TargetSelector()
         notify[vol.Optional(CONF_CUSTOM_TARGET)] = TextSelector(TextSelectorConfig(multiple=True))
@@ -247,6 +257,9 @@ class AppliancesOptionsFlow(OptionsFlowWithReload):
         # a power monitored appliance has no progress to report
         schema = await settings_schema(self.hass, progress=self.config_entry.data.get(CONF_TYPE) != TYPE_POWER)
         shown = dict(self.config_entry.options)
+        if shown.get(CONF_DASHBOARD) not in dashboards(self.hass):
+            # removed since it was chosen
+            shown.pop(CONF_DASHBOARD, None)
         for key, text in defaults.items():
             shown[key] = str(shown.get(key) or text).replace(NAME_PLACEHOLDER, name)
         return self.async_show_form(

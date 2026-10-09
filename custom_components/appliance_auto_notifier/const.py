@@ -17,6 +17,12 @@ CONF_CUSTOM_TARGET: Final[str] = "custom_target"
 CONF_DELIVERIES: Final[str] = "deliveries"
 # whether progress is told with ordinary notifications, the Live Activity is kept up to date regardless
 CONF_NOTIFY_PROGRESS: Final[str] = "notify_progress"
+# path of the dashboard opened by a tap on a notification, the app is opened where it was last if there's none
+CONF_DASHBOARD: Final[str] = "dashboard"
+LOVELACE_DOMAIN: Final[str] = "lovelace"
+# the dashboard Home Assistant starts with has no path of its own in the list of them
+DEFAULT_DASHBOARD: Final[str] = "lovelace"
+DEFAULT_DASHBOARD_TITLE: Final[str] = "Overview"
 # the one entry that isn't an appliance, holding whether appliances found are set up without asking
 TYPE_DISCOVERY: Final[str] = "discovery"
 CONF_AUTO_DISCOVER: Final[str] = "auto_discover"
@@ -47,6 +53,8 @@ SUPERNOTIFY_MISSING: Final[str] = (
 CYCLE_KEYS: Final[dict[str, str]] = {"home_connect": "operation_state"}
 PROGRESS_KEY: Final[str] = "program_progress"
 FINISH_TIME_KEY: Final[str] = "program_finish_time"
+# a select, unlike the others, of the program under way
+PROGRAM_KEY: Final[str] = "active_program"
 
 STATE_RUN: Final[str] = "run"
 # a cycle already under way, so not a new start when `run` follows
@@ -58,6 +66,9 @@ STATES_ABANDONED: Final[tuple[str, ...]] = ("error", "aborting")
 
 # percentage points between Live Activity updates, since mobile platforms throttle frequent ones
 PROGRESS_STEP: Final[int] = 10
+# from here on the end is in sight and the bar is being watched, so it's kept closer to the appliance
+PROGRESS_FINAL: Final[int] = 90
+PROGRESS_FINAL_STEP: Final[int] = 2
 
 MOBILE_PUSH_TRANSPORT: Final[str] = "mobile_push"
 # platform of the notify entities used when there's no Supernotify and none have been chosen

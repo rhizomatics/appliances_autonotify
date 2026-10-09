@@ -59,7 +59,9 @@ Raise the grace period for appliances that pause mid-cycle, such as a washing ma
 ## Settings
 
 Nothing needs changing for notifications to work. Each appliance on the integration's page has settings: a
-*Notify progress* switch, off by default, and then three sections that start closed.
+*Notify progress* switch, off by default, with Supernotify a *Dashboard to open* when a notification or the Live
+Activity is tapped, and then three sections that start closed. The dashboard is a choice of those in Home Assistant,
+never a URL to type in, so a notification can't be made to open anything else.
 
 | Section              | What it does                                                                                 |
 | -------------------- | -------------------------------------------------------------------------------------------- |
@@ -72,7 +74,8 @@ Nothing needs changing for notifications to work. Each appliance on the integrat
 | When                                   | With Supernotify                                                    | Without             |
 | -------------------------------------- | ------------------------------------------------------------------- | ------------------- |
 | Cycle starts                           | Start notification everywhere, opening a Live Activity on phones     | Start notification  |
-| Every 10% of progress                  | Silent update of the Live Activity, on phones only. With *Notify progress* on, a notification everywhere instead, which updates the Live Activity too | Nothing, or with *Notify progress* on, a notification |
+| Every 10% of progress                  | Silent update of the Live Activity, on phones only, with the program under way as its message, such as "Eco 50ºC". With *Notify progress* on, a notification everywhere instead, which updates the Live Activity too | Nothing, or with *Notify progress* on, a notification |
+| Every 2% of progress, from 90%         | Silent update of the Live Activity, on phones only                  | Nothing             |
 | Cycle finishes                         | Live Activity closed, then an end notification everywhere           | End notification    |
 | Cycle is aborted, or fails             | Live Activity closed, with no end notification                      | Nothing             |
 
@@ -83,7 +86,7 @@ counts as finished.
 
 - If the appliance never reports the end of its cycle, the Live Activity stays on the phone until dismissed
 - If Home Assistant restarts mid-cycle, the end is still notified and the Live Activity closed
-- Progress and time remaining are only shown where the appliance reports them, so never for a power monitored appliance
+- Progress, time remaining and the program are only shown where the appliance reports them, so never for a power monitored appliance
 
 ## Known Issues
 

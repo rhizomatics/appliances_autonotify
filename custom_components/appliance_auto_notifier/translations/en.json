@@ -54,9 +54,11 @@
                 "title": "Notifications for {name}",
                 "description": "Everything here is optional.\n\n{supernotify}",
                 "data": {
-                    "notify_progress": "Notify progress"
+                    "notify_progress": "Notify progress",
+                    "dashboard": "Dashboard to open"
                 },
                 "data_description": {
+                    "dashboard": "Opened when a notification or the Live Activity is tapped. Leave empty to open the app where it was.",
                     "notify_progress": "Send a notification every 10% of the cycle. When off, progress is only shown on the progress bar of the Live Activity, which is updated silently."
                 },
                 "sections": {

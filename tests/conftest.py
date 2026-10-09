@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -25,6 +26,7 @@ class FakeAppliance:
     cycle: str
     progress: str
     finish_time: str
+    program: str
 
 
 def add_appliance(hass: HomeAssistant, name: str = "Dishwasher", ha_id: str = "BOSCH-1") -> FakeAppliance:
@@ -36,9 +38,9 @@ def add_appliance(hass: HomeAssistant, name: str = "Dishwasher", ha_id: str = "B
     )
     entity_registry = er.async_get(hass)
     entity_ids: dict[str, str] = {}
-    for key in ("operation_state", "program_progress", "program_finish_time"):
+    for key in ("operation_state", "program_progress", "program_finish_time", "active_program"):
         entity_ids[key] = entity_registry.async_get_or_create(
-            "sensor",
+            "select" if key == "active_program" else "sensor",
             "home_connect",
             f"{ha_id}-{key}",
             suggested_object_id=f"{name.lower()}_{key}",
@@ -47,8 +49,25 @@ def add_appliance(hass: HomeAssistant, name: str = "Dishwasher", ha_id: str = "B
             translation_key=key,
         ).entity_id
     return FakeAppliance(
-        device.id, entity_ids["operation_state"], entity_ids["program_progress"], entity_ids["program_finish_time"]
+        device.id,
+        entity_ids["operation_state"],
+        entity_ids["program_progress"],
+        entity_ids["program_finish_time"],
+        entity_ids["active_program"],
     )
+
+
+def mock_dashboards(hass: HomeAssistant) -> None:
+    """The dashboards as the lovelace integration keeps them, the default one being there with and without a path"""
+    overview = SimpleNamespace(config={"title": "Overview", "url_path": "lovelace"})
+    kitchen = SimpleNamespace(config={"title": "Kitchen", "url_path": "dashboard-kitchen"})
+    hass.data["lovelace"] = SimpleNamespace(
+        dashboards={None: SimpleNamespace(config=None), "lovelace": overview, "dashboard-kitchen": kitchen}
+    )
+
+
+def mock_dashboard(hass: HomeAssistant, url_path: str, title: str) -> None:
+    hass.data["lovelace"].dashboards[url_path] = SimpleNamespace(config={"title": title, "url_path": url_path})
 
 
 def mock_supernotify(hass: HomeAssistant) -> list[ServiceCall]:
