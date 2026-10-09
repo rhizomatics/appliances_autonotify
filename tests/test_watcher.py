@@ -107,6 +107,50 @@ async def test_progress_updates_mobile_only(hass: HomeAssistant) -> None:
     assert len(calls) == 4
 
 
+async def test_progress_notified_when_asked_for(hass: HomeAssistant) -> None:
+    appliance = add_appliance(hass)
+    calls = mock_supernotify(hass)
+    entry = await setup_watcher(hass, appliance, {"notify_progress": True, "deliveries": ["chimes", "phones"]})
+    tag = f"appliance_{entry.entry_id}"
+
+    await set_state(hass, appliance.cycle, "run")
+    # the first reading comes straight after the start, so only fills in the Live Activity
+    await set_state(hass, appliance.progress, "4")
+    assert len(calls) == 2
+    assert calls[1].data["delivery"] == ["phones"]
+    assert calls[1].data["extra_data"]["silent"] is True
+
+    # an ordinary notification, everywhere chosen, which keeps the Live Activity up to date too
+    await set_state(hass, appliance.progress, "10")
+    assert len(calls) == 3
+    assert calls[2].data == {
+        "message": "10% complete",
+        "title": "Dishwasher",
+        "force_resend": True,
+        "delivery_selection": "explicit",
+        "delivery": ["chimes", "phones"],
+        "extra_data": {
+            "mobile_push_notification_tag": tag,
+            "live_update": True,
+            "notification_icon": "mdi:dishwasher",
+            "progress": 10,
+            "progress_max": 100,
+        },
+    }
+
+
+async def test_progress_notified_without_supernotify(hass: HomeAssistant) -> None:
+    appliance = add_appliance(hass)
+    await setup_watcher(hass, appliance, {"targets": ["notify.kitchen_display"], "notify_progress": True})
+    calls = async_mock_service(hass, "notify", "send_message")
+
+    await set_state(hass, appliance.cycle, "run")
+    await set_state(hass, appliance.progress, "4")
+    assert len(calls) == 1
+    await set_state(hass, appliance.progress, "30")
+    assert [c.data["message"] for c in calls] == ["Dishwasher started", "30% complete"]
+
+
 async def test_progress_known_at_start_is_not_repeated(hass: HomeAssistant) -> None:
     appliance = add_appliance(hass)
     calls = mock_supernotify(hass)

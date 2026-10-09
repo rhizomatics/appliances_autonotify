@@ -30,6 +30,7 @@ from .const import (
     CONF_END_MESSAGE,
     CONF_END_TITLE,
     CONF_GRACE_PERIOD,
+    CONF_NOTIFY_PROGRESS,
     CONF_POWER_ENTITY,
     CONF_START_MESSAGE,
     CONF_START_TITLE,
@@ -75,7 +76,10 @@ def discovery_schema(auto_discover: bool = True) -> vol.Schema:
     return vol.Schema({vol.Required(CONF_AUTO_DISCOVER, default=auto_discover): BooleanSelector()})
 
 
-async def settings_schema(hass: HomeAssistant) -> vol.Schema:
+async def settings_schema(hass: HomeAssistant, progress: bool = True) -> vol.Schema:
+    fields: dict[vol.Marker, Any] = {}
+    if progress:
+        fields[vol.Required(CONF_NOTIFY_PROGRESS, default=False)] = BooleanSelector()
     notify: dict[vol.Marker, Any] = {}
     if supernotify_available(hass):
         # the same pair of target fields as supernotify.notify itself
@@ -97,17 +101,29 @@ async def settings_schema(hass: HomeAssistant) -> vol.Schema:
         SECTION_NOTIFY: notify,
     }
     # all tuning, so out of the way until it's wanted
-    return vol.Schema({
-        vol.Required(name): section(vol.Schema(fields), {"collapsed": True}) for name, fields in sections.items()
+    fields.update({
+        vol.Required(name): section(vol.Schema(contents), {"collapsed": True}) for name, contents in sections.items()
     })
+    return vol.Schema(fields)
 
 
-def sectioned(schema: vol.Schema, values: dict[str, Any]) -> dict[str, dict[str, Any]]:
+def sectioned(schema: vol.Schema, values: dict[str, Any]) -> dict[str, Any]:
     """Settings are stored flat, the sections are only for display"""
-    return {
-        str(name): {str(key): values[key] for key in fields.schema.schema if key in values}
-        for name, fields in schema.schema.items()
-    }
+    shown: dict[str, Any] = {}
+    for name, field in schema.schema.items():
+        if isinstance(field, section):
+            shown[str(name)] = {str(key): values[key] for key in field.schema.schema if key in values}
+        elif name in values:
+            shown[str(name)] = values[name]
+    return shown
+
+
+def flattened(user_input: dict[str, Any]) -> dict[str, Any]:
+    """The settings of a form, with those in sections alongside the rest"""
+    settings: dict[str, Any] = {}
+    for name, value in user_input.items():
+        settings.update(value if isinstance(value, dict) else {name: value})
+    return settings
 
 
 def power_schema(with_name: bool) -> vol.Schema:
@@ -147,10 +163,14 @@ class AppliancesConfigFlow(ConfigFlow, domain=DOMAIN):
             return self.async_create_entry(title=DISCOVERY_TITLE, data={CONF_TYPE: TYPE_DISCOVERY}, options=user_input)
         configured = self._async_current_ids()
         found = [a.name for a in find_appliances(self.hass) if a.device_id not in configured]
+        if found:
+            found_text = "Appliances found:\n\n" + "\n".join(f"- {name}" for name in found)
+        else:
+            found_text = "No appliances could be automatically installed."
         return self.async_show_form(
             step_id="user",
             data_schema=discovery_schema(),
-            description_placeholders={"found": ", ".join(found) or "none yet", "supernotify": supernotify_status(self.hass)},
+            description_placeholders={"found": found_text, "supernotify": supernotify_status(self.hass)},
         )
 
     async def async_step_power(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
@@ -219,17 +239,13 @@ class AppliancesOptionsFlow(OptionsFlowWithReload):
         defaults = {key: text.replace(NAME_PLACEHOLDER, name) for key, text in DEFAULT_TEXTS.items()}
         if user_input is not None:
             # text left as the default isn't a setting, so it goes on following the name of the appliance
-            settings = {
-                key: value
-                for fields in user_input.values()
-                for key, value in fields.items()
-                if value and value != defaults.get(key)
-            }
+            settings = {key: value for key, value in flattened(user_input).items() if value and value != defaults.get(key)}
             if self.config_entry.data.get(CONF_TYPE) == TYPE_POWER:
                 self._settings = settings
                 return await self.async_step_power()
             return self.async_create_entry(data=settings)
-        schema = await settings_schema(self.hass)
+        # a power monitored appliance has no progress to report
+        schema = await settings_schema(self.hass, progress=self.config_entry.data.get(CONF_TYPE) != TYPE_POWER)
         shown = dict(self.config_entry.options)
         for key, text in defaults.items():
             shown[key] = str(shown.get(key) or text).replace(NAME_PLACEHOLDER, name)

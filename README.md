@@ -58,8 +58,8 @@ Raise the grace period for appliances that pause mid-cycle, such as a washing ma
 
 ## Settings
 
-Nothing needs changing for notifications to work. Each appliance on the integration's page has settings, in three
-sections that start closed.
+Nothing needs changing for notifications to work. Each appliance on the integration's page has settings: a
+*Notify progress* switch, off by default, and then three sections that start closed.
 
 | Section              | What it does                                                                                 |
 | -------------------- | -------------------------------------------------------------------------------------------- |
@@ -72,7 +72,7 @@ sections that start closed.
 | When                                   | With Supernotify                                                    | Without             |
 | -------------------------------------- | ------------------------------------------------------------------- | ------------------- |
 | Cycle starts                           | Start notification everywhere, opening a Live Activity on phones     | Start notification  |
-| Every 10% of progress                  | Silent update of the Live Activity, on phones only                  | Nothing             |
+| Every 10% of progress                  | Silent update of the Live Activity, on phones only. With *Notify progress* on, a notification everywhere instead, which updates the Live Activity too | Nothing, or with *Notify progress* on, a notification |
 | Cycle finishes                         | Live Activity closed, then an end notification everywhere           | End notification    |
 | Cycle is aborted, or fails             | Live Activity closed, with no end notification                      | Nothing             |
 
@@ -84,6 +84,31 @@ counts as finished.
 - If the appliance never reports the end of its cycle, the Live Activity stays on the phone until dismissed
 - If Home Assistant restarts mid-cycle, the end is still notified and the Live Activity closed
 - Progress and time remaining are only shown where the appliance reports them, so never for a power monitored appliance
+
+## Known Issues
+
+Both of these have been seen on an iPhone, and neither has a confirmed cause yet.
+
+### Progress bar behind the appliance
+
+The progress bar of the Live Activity can fall well behind, such as showing 40% while the appliance is at 74%.
+
+The likely cause is iOS. Progress is sent with `silent: true`, so that the phone doesn't alert every 10%, and the
+[Companion App](https://companion.home-assistant.io/docs/notifications/live-activities) sends silent updates at a
+lower priority, which iOS may delay, batch or drop. This is a theory, since it hasn't been tested by sending the
+updates without `silent`.
+
+Turning on *Notify progress* sends each update as an ordinary notification, without `silent`, so is worth
+trying if the bar matters more than the interruptions.
+
+### Seconds shown as dashes
+
+The time remaining sometimes has dashes in place of the seconds, such as `52:--` or `1:30:--`, on the Lock Screen
+while the Dynamic Island shows a full countdown at the same moment.
+
+The same finish time is sent however it ends up shown, and the Companion App has no setting for the format of the
+timer, so this is down to the phone. The likely reason is that the Lock Screen is redrawn less often while it's
+dimmed or always-on, so drops the seconds. This is also a theory, and nothing has been found that changes it.
 
 ## Development
 

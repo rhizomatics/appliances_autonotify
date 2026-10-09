@@ -4,7 +4,7 @@
         "step": {
             "user": {
                 "title": "Appliance notifications",
-                "description": "Get told when an appliance starts and finishes, with nothing more to set up.\n\nWith automatic discovery, every supported appliance is set up for you, now and whenever you add another. Found so far: **{found}**. Only Home Connect (Bosch, Neff, Siemens) appliances are supported so far.\n\nEach appliance is then listed on this integration's page, where you can change its notifications or disable it. Any other appliance on a smart plug or power monitor can be added there later.\n\n{supernotify}",
+                "description": "{supernotify}\n\n{found}\n\nOnly Home Connect (Bosch, Siemens, Neff) appliances are discovered automatically. Power monitored appliances aren't automatically discovered, but can be set up manually once the installation is complete.",
                 "data": {
                     "auto_discover": "Set up appliances automatically"
                 },
@@ -53,6 +53,12 @@
             "settings": {
                 "title": "Notifications for {name}",
                 "description": "Everything here is optional.\n\n{supernotify}",
+                "data": {
+                    "notify_progress": "Notify progress"
+                },
+                "data_description": {
+                    "notify_progress": "Send a notification every 10% of the cycle. When off, progress is only shown on the progress bar of the Live Activity, which is updated silently."
+                },
                 "sections": {
                     "start": {
                         "name": "Start message",

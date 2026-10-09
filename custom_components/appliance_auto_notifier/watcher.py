@@ -21,6 +21,7 @@ from .const import (
     CONF_END_MESSAGE,
     CONF_END_TITLE,
     CONF_GRACE_PERIOD,
+    CONF_NOTIFY_PROGRESS,
     CONF_POWER_ENTITY,
     CONF_START_MESSAGE,
     CONF_START_TITLE,
@@ -70,6 +71,7 @@ class ApplianceWatcher:
         self.cycle_entity_id: str | None = None
         self.progress_entity_id: str | None = None
         self.finish_time_entity_id: str | None = None
+        self.notify_progress: bool = entry.options.get(CONF_NOTIFY_PROGRESS, False)
         self.running: bool = False
         self.last_progress_step: int = 0
         # one notification at a time, so a progress update can't overtake the end and reopen the Live Activity
@@ -81,23 +83,33 @@ class ApplianceWatcher:
 
     async def _progress_changed(self, event: Event[EventStateChangedData]) -> None:
         progress = self._progress()
-        if not self.running or progress is None or not supernotify_available(self.hass):
+        if not self.running or progress is None:
             return
         step = progress // PROGRESS_STEP
         if step <= self.last_progress_step:
             return
         self.last_progress_step = step
+        live = supernotify_available(self.hass)
+        # the first reading only fills in the Live Activity, coming straight after the start notification
+        ordinary = self.notify_progress and step > 0
+        if not live and not ordinary:
+            return
+        message = PROGRESS_MESSAGE.format(progress=progress)
+        # a Live Activity keeps the title it started with
+        title = self._text(CONF_START_TITLE, DEFAULT_TITLE)
         async with self._sending:
             if not self.running:
                 # the cycle ended while this waited its turn
                 return
-            # a Live Activity keeps the title it started with
-            await self._supernotify(
-                PROGRESS_MESSAGE.format(progress=progress),
-                self._text(CONF_START_TITLE, DEFAULT_TITLE),
-                mobile_only=True,
-                extra_data=self._live_data() | {"silent": True, "alert_once": True},
-            )
+            if not live:
+                await self._send_message(message, title)
+            elif ordinary:
+                # everywhere, as for the start, and updating the Live Activity on phones as it goes
+                await self._supernotify(message, title, resend=True, extra_data=self._live_data())
+            else:
+                await self._supernotify(
+                    message, title, mobile_only=True, extra_data=self._live_data() | {"silent": True, "alert_once": True}
+                )
 
     async def _started(self) -> None:
         title = self._text(CONF_START_TITLE, DEFAULT_TITLE)
@@ -155,9 +167,17 @@ class ApplianceWatcher:
         return data
 
     async def _supernotify(
-        self, message: str, title: str, mobile_only: bool = False, extra_data: dict[str, Any] | None = None
+        self,
+        message: str,
+        title: str,
+        mobile_only: bool = False,
+        resend: bool = False,
+        extra_data: dict[str, Any] | None = None,
     ) -> None:
         data: dict[str, Any] = {"message": message, "title": title}
+        if resend:
+            # Supernotify's duplicate check ignores digits, so would drop progress updates as repeats
+            data["force_resend"] = True
         deliveries: list[str] = list(self.entry.options.get(CONF_DELIVERIES) or [])
         try:
             if mobile_only:
@@ -167,7 +187,6 @@ class ApplianceWatcher:
                     _LOGGER.warning("APPLIANCES No mobile push delivery found for %s, Live Activity not updated", self.name)
                     return
                 data["delivery_selection"] = "fixed"
-                # Supernotify's duplicate check ignores digits, so would drop progress updates as repeats
                 data["force_resend"] = True
             elif deliveries:
                 data["delivery_selection"] = "explicit"

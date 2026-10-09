@@ -15,6 +15,8 @@ CONF_TARGETS: Final[str] = "targets"
 CONF_TARGET: Final[str] = "target"
 CONF_CUSTOM_TARGET: Final[str] = "custom_target"
 CONF_DELIVERIES: Final[str] = "deliveries"
+# whether progress is told with ordinary notifications, the Live Activity is kept up to date regardless
+CONF_NOTIFY_PROGRESS: Final[str] = "notify_progress"
 # the one entry that isn't an appliance, holding whether appliances found are set up without asking
 TYPE_DISCOVERY: Final[str] = "discovery"
 CONF_AUTO_DISCOVER: Final[str] = "auto_discover"

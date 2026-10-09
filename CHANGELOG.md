@@ -1,3 +1,5 @@
+# 0.3.1
+- *Notify progress* switch in the settings of each appliance, above the sections and off by default, to be sent a notification every 10% of the cycle. The Live Activity is silently updated either way
 # 0.3.0
 - Simpler install: one screen with a switch for automatic discovery, on by default, which sets up every appliance found now and later with no settings to fill in
 - *Automatic discovery* is listed on the integration's page with the appliances, where the switch can be changed
