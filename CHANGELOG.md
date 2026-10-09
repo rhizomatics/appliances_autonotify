@@ -1,3 +1,5 @@
+# 0.5.0
+Preparation for HACS release
 # 0.4.0
 - Add icons
 - Progress bar updated every 2% for the last 10% of the cycle

@@ -1,5 +1,7 @@
 # Appliance Auto Notifier
 
+[![CI](https://github.com/rhizomatics/appliances_supernotifications/actions/workflows/ci.yml/badge.svg)](https://github.com/rhizomatics/appliances_supernotifications/actions/workflows/ci.yml)
+
 Automatic notifications for household appliances in Home Assistant, with no automations or YAML.
 
 ![Example Dishwasher Progress](docs/assets/images/dishwasher_progress.png)
@@ -25,8 +27,10 @@ unless you choose other notify entities.
 
 ## Install
 
-1. In HACS, add `https://github.com/rhizomatics/appliances_supernotifications` as a custom repository of type
-   *Integration*, install *Appliance Auto Notifier* and restart Home Assistant
+[![Open in HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=rhizomatics&repository=appliances_supernotifications&category=integration)
+
+1. Use the button above, or in HACS add `https://github.com/rhizomatics/appliances_supernotifications` as a custom
+   repository of type *Integration*, then install *Appliance Auto Notifier* and restart Home Assistant
 2. In *Settings*, *Devices & services*, choose *Add integration* and pick *Appliance Auto Notifier*
 3. Leave *Set up appliances automatically* on, and submit
 
