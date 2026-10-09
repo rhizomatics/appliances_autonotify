@@ -1,3 +1,6 @@
+# 0.3.2
+Add icons
+
 # 0.3.1
 - *Notify progress* switch in the settings of each appliance, above the sections and off by default, to be sent a notification every 10% of the cycle. The Live Activity is silently updated either way
 # 0.3.0
