@@ -2,6 +2,8 @@
 
 Automatic notifications for household appliances in Home Assistant, with no automations or YAML.
 
+![Example Dishwasher Progress](docs/assets/images/dishwasher_progress.png)
+
 When a dishwasher, washing machine, oven or other appliance starts a cycle, you're told it started, your phone
 shows a [Live Activity](https://companion.home-assistant.io/docs/notifications/live-activities) with progress
 and time remaining while it runs, and you're told when it finishes.
@@ -18,24 +20,34 @@ in English only. Any other appliance can be added by hand if it has a power moni
   beyond a plain notification
 - Home Assistant app installed on an Apple mobile device, minimum iOS/iPadOS 17.2
 
-Without Supernotify, it only sends a start and an end notification, to notify entities you choose.
+Without Supernotify, it only sends a start and an end notification, to every phone with the Home Assistant app
+unless you choose other notify entities.
 
 ## Install
 
 1. In HACS, add `https://github.com/rhizomatics/appliances_supernotifications` as a custom repository of type
    *Integration*, install *Appliance Auto Notifier* and restart Home Assistant
+2. In *Settings*, *Devices & services*, choose *Add integration* and pick *Appliance Auto Notifier*
+3. Leave *Set up appliances automatically* on, and submit
 
-Home Connect appliances are offered automatically as *Discovered* on the *Devices & services* page, including
-appliances you add later. Choose *Add* to set one up, or *Ignore* on any you don't want.
+That's all. Every Home Connect appliance is set up straight away, and so is any you add later. Each is listed on
+the integration's page, alongside *Automatic discovery*, and notifies with no further settings.
+
+To stop the notifications for an appliance, disable it rather than delete it, since a deleted appliance is found
+and set up again.
+
+### Choosing Appliances Yourself
+
+Turn *Set up appliances automatically* off, on the first screen or later from the settings of *Automatic discovery*,
+and appliances are instead offered as *Discovered* on the *Devices & services* page. Choose *Add* to set one up,
+or *Ignore* on any you don't want.
 
 ### Power Monitored Appliances
 
 An appliance with no supported integration can be added if a sensor measures the power it draws.
 
-1. In *Settings*, *Devices & services*, choose *Add integration* and pick *Appliance Auto Notifier*
-2. Choose *Power Monitored Appliance*
-3. Give the appliance a name, and choose its power sensor
-4. Optionally change the notification settings
+1. On the integration's page, choose *Add service*
+2. Give the appliance a name, and choose its power sensor
 
 | Setting         | Default    | What it does                                                                              |
 | --------------- | ---------- | ----------------------------------------------------------------------------------------- |
@@ -44,20 +56,16 @@ An appliance with no supported integration can be added if a sensor measures the
 
 Raise the grace period for appliances that pause mid-cycle, such as a washing machine soaking.
 
-When appliances have been found and not yet set up, *Appliances found* is also offered, to set them all up
-at once with the same settings.
-
 ## Settings
 
-Each appliance is listed on the integration's page, where it can be changed, disabled or deleted.
+Nothing needs changing for notifications to work. Each appliance on the integration's page has settings, in three
+sections that start closed.
 
-| Setting                    | What it does                                                                                 |
-| -------------------------- | -------------------------------------------------------------------------------------------- |
-| Start title and message    | Shown with the default, "Dishwasher started", to change. `{name}` becomes the name of the appliance |
-| End title and message      | Shown with the default, "Dishwasher is finished", to change                                  |
-| Targets                    | With Supernotify, the same choice of entities, devices, areas, floors and labels as any Supernotify notification, and optional. Without, notify entities only, and at least one is needed |
-| Custom targets             | Only with Supernotify: targets outside Home Assistant, such as e-mail addresses or phone numbers |
-| Deliveries                 | Only with Supernotify: limit notifications to these deliveries. Leave empty for Supernotify to choose |
+| Section              | What it does                                                                                 |
+| -------------------- | -------------------------------------------------------------------------------------------- |
+| Start message        | The title and message sent when the appliance starts, shown as they'll be sent, such as "Dishwasher started". Clear a box to go back to the usual wording |
+| End message          | The same for when it finishes, such as "Dishwasher is finished"                              |
+| Notification targets | With Supernotify, *Targets* is the same choice of entities, devices, areas, floors and labels as any Supernotify notification, *Custom targets* is for those outside Home Assistant, such as e-mail addresses or phone numbers, and *Deliveries* limits notifications to those chosen. Leave them empty for Supernotify to choose. Without Supernotify, *Targets* is a choice of notify entities, and left empty means every phone with the Home Assistant app |
 
 ## What Gets Sent
 

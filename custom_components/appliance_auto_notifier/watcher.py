@@ -36,6 +36,7 @@ from .const import (
     DEFAULT_TITLE,
     FINISH_TIME_KEY,
     ICONS,
+    MOBILE_APP_PLATFORM,
     MOBILE_PUSH_TRANSPORT,
     NAME_PLACEHOLDER,
     PROGRESS_KEY,
@@ -182,11 +183,20 @@ class ApplianceWatcher:
             _LOGGER.exception("APPLIANCES Supernotify notification failed for %s", self.name)
 
     async def _send_message(self, message: str, title: str) -> None:
+        # with none chosen, every phone with the mobile app is told
+        targets: list[str] = self.entry.options.get(CONF_TARGETS) or [
+            entity.entity_id
+            for entity in er.async_get(self.hass).entities.values()
+            if entity.domain == "notify" and entity.platform == MOBILE_APP_PLATFORM and not entity.disabled
+        ]
+        if not targets:
+            _LOGGER.warning("APPLIANCES Nothing to notify for %s, choose targets in its settings", self.name)
+            return
         try:
             await self.hass.services.async_call(
                 "notify",
                 "send_message",
-                {ATTR_ENTITY_ID: self.entry.options.get(CONF_TARGETS), "message": message, "title": title},
+                {ATTR_ENTITY_ID: targets, "message": message, "title": title},
                 blocking=True,
             )
         except HomeAssistantError:

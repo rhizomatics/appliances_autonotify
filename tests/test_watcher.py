@@ -7,6 +7,7 @@ from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import CONF_DEVICE_ID
 from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers import entity_registry as er
 from homeassistant.util import dt as dt_util
 from pytest_homeassistant_custom_component.common import MockConfigEntry, async_fire_time_changed, async_mock_service
 
@@ -276,6 +277,24 @@ async def test_cycle_without_supernotify(hass: HomeAssistant) -> None:
     assert await hass.config_entries.async_unload(entry.entry_id)
     await set_state(hass, appliance.cycle, "run")
     assert len(calls) == 3
+
+
+async def test_phones_notified_when_nothing_chosen(hass: HomeAssistant, caplog) -> None:
+    appliance = add_appliance(hass)
+    await setup_watcher(hass, appliance)
+    calls = async_mock_service(hass, "notify", "send_message")
+
+    await set_state(hass, appliance.cycle, "run")
+    assert not calls
+    assert "Nothing to notify for Dishwasher" in caplog.text
+
+    registry = er.async_get(hass)
+    phone = registry.async_get_or_create("notify", "mobile_app", "phone", suggested_object_id="phone")
+    registry.async_get_or_create("notify", "mobile_app", "old", disabled_by=er.RegistryEntryDisabler.USER)
+    registry.async_get_or_create("notify", "demo", "display")
+    await set_state(hass, appliance.cycle, "finished")
+    assert len(calls) == 1
+    assert calls[0].data["entity_id"] == [phone.entity_id]
 
 
 async def test_notification_failure_is_logged(hass: HomeAssistant, caplog) -> None:

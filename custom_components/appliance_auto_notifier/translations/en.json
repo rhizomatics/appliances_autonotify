@@ -4,19 +4,17 @@
         "step": {
             "user": {
                 "title": "Appliance notifications",
-                "description": "Choose the type of appliance to add. Appliances with their own supported integration are found automatically.",
-                "menu_options": {
-                    "power": "Power Monitored Appliance",
-                    "found": "Appliances found"
+                "description": "Get told when an appliance starts and finishes, with nothing more to set up.\n\nWith automatic discovery, every supported appliance is set up for you, now and whenever you add another. Found so far: **{found}**. Only Home Connect (Bosch, Neff, Siemens) appliances are supported so far.\n\nEach appliance is then listed on this integration's page, where you can change its notifications or disable it. Any other appliance on a smart plug or power monitor can be added there later.\n\n{supernotify}",
+                "data": {
+                    "auto_discover": "Set up appliances automatically"
                 },
-                "menu_option_descriptions": {
-                    "power": "Any appliance on a smart plug or other power monitor, running while it draws power",
-                    "found": "Set up every appliance found and not yet set up, all with the same settings"
+                "data_description": {
+                    "auto_discover": "Turn off to be offered each appliance found, and choose which to add"
                 }
             },
             "power": {
                 "title": "Power Monitored Appliance",
-                "description": "The appliance starts when its power goes above the threshold, and ends once it has stayed at or below it for the grace period.",
+                "description": "For any appliance on a smart plug or other power monitor. It starts when its power goes above the threshold, and ends once it has stayed at or below it for the grace period.",
                 "data": {
                     "name": "Appliance name",
                     "power_entity": "Power sensor",
@@ -30,76 +28,64 @@
                     "grace_period": "How long the power must stay at or below the threshold before the cycle is over, so short drop outs are ignored"
                 }
             },
-            "found": {
-                "title": "Appliance notifications",
-                "description": "These settings are used for every appliance found: **{name}**. Each is set up separately, so can be changed or disabled afterwards.\n\n{supernotify}\n\n`{placeholder}` is replaced by the name of the appliance. Clear a title or message to go back to its default.",
-                "data": {
-                    "start_title": "Start title",
-                    "start_message": "Start message",
-                    "end_title": "End title",
-                    "end_message": "End message",
-                    "targets": "Targets",
-                    "target": "Targets",
-                    "custom_target": "Custom targets",
-                    "deliveries": "Deliveries"
-                },
-                "data_description": {
-                    "targets": "Notify entities to send to. At least one is needed, since Supernotify is not installed.",
-                    "target": "Who or what to notify, as for any Supernotify notification. Leave empty for Supernotify to choose.",
-                    "custom_target": "Targets outside of Home Assistant, such as e-mail addresses or phone numbers.",
-                    "deliveries": "Limit notifications to these Supernotify deliveries. Leave empty for Supernotify to choose."
-                }
-            },
-            "settings": {
+            "confirm": {
                 "title": "Notifications for {name}",
-                "description": "{supernotify}\n\n`{placeholder}` is replaced by the name of the appliance. Clear a title or message to go back to its default.",
-                "data": {
-                    "start_title": "Start title",
-                    "start_message": "Start message",
-                    "end_title": "End title",
-                    "end_message": "End message",
-                    "targets": "Targets",
-                    "target": "Targets",
-                    "custom_target": "Custom targets",
-                    "deliveries": "Deliveries"
-                },
-                "data_description": {
-                    "targets": "Notify entities to send to. At least one is needed, since Supernotify is not installed.",
-                    "target": "Who or what to notify, as for any Supernotify notification. Leave empty for Supernotify to choose.",
-                    "custom_target": "Targets outside of Home Assistant, such as e-mail addresses or phone numbers.",
-                    "deliveries": "Limit notifications to these Supernotify deliveries. Leave empty for Supernotify to choose."
-                }
+                "description": "Get told when {name} starts and finishes?\n\n{supernotify}"
             }
-        },
-        "error": {
-            "targets_required": "Choose at least one notify entity, since Supernotify is not installed"
         },
         "abort": {
             "already_configured": "This appliance is already set up",
-            "already_in_progress": "Set up of this appliance is already in progress",
-            "no_appliances": "No supported appliances were found that aren't already set up. Only Home Connect (Bosch, Neff, Siemens) appliances are supported so far."
+            "already_in_progress": "Set up of this appliance is already in progress"
         }
     },
     "options": {
         "step": {
-            "init": {
-                "title": "Notifications for {name}",
-                "description": "{supernotify}\n\n`{placeholder}` is replaced by the name of the appliance. Clear a title or message to go back to its default.",
+            "discovery": {
+                "title": "Automatic discovery",
+                "description": "With automatic discovery, every supported appliance is set up for you, now and whenever you add another. Appliances already set up are left as they are.",
                 "data": {
-                    "start_title": "Start title",
-                    "start_message": "Start message",
-                    "end_title": "End title",
-                    "end_message": "End message",
-                    "targets": "Targets",
-                    "target": "Targets",
-                    "custom_target": "Custom targets",
-                    "deliveries": "Deliveries"
+                    "auto_discover": "Set up appliances automatically"
                 },
                 "data_description": {
-                    "targets": "Notify entities to send to. At least one is needed, since Supernotify is not installed.",
-                    "target": "Who or what to notify, as for any Supernotify notification. Leave empty for Supernotify to choose.",
-                    "custom_target": "Targets outside of Home Assistant, such as e-mail addresses or phone numbers.",
-                    "deliveries": "Limit notifications to these Supernotify deliveries. Leave empty for Supernotify to choose."
+                    "auto_discover": "Turn off to be offered each appliance found, and choose which to add"
+                }
+            },
+            "settings": {
+                "title": "Notifications for {name}",
+                "description": "Everything here is optional.\n\n{supernotify}",
+                "sections": {
+                    "start": {
+                        "name": "Start message",
+                        "description": "Sent when the appliance starts. Clear a box to go back to the usual wording.",
+                        "data": {
+                            "start_title": "Title",
+                            "start_message": "Message"
+                        }
+                    },
+                    "end": {
+                        "name": "End message",
+                        "description": "Sent when the appliance finishes. Clear a box to go back to the usual wording.",
+                        "data": {
+                            "end_title": "Title",
+                            "end_message": "Message"
+                        }
+                    },
+                    "notify": {
+                        "name": "Notification targets",
+                        "description": "Who and what is notified. Leave everything empty for the usual choice.",
+                        "data": {
+                            "targets": "Targets",
+                            "target": "Targets",
+                            "custom_target": "Custom targets",
+                            "deliveries": "Deliveries"
+                        },
+                        "data_description": {
+                            "targets": "Notify entities to send to. Leave empty for every phone with the Home Assistant app.",
+                            "target": "Who or what to notify, as for any Supernotify notification. Leave empty for Supernotify to choose.",
+                            "custom_target": "Targets outside of Home Assistant, such as e-mail addresses or phone numbers.",
+                            "deliveries": "Limit notifications to these Supernotify deliveries. Leave empty for Supernotify to choose."
+                        }
+                    }
                 }
             },
             "power": {
@@ -116,9 +102,6 @@
                     "grace_period": "How long the power must stay at or below the threshold before the cycle is over, so short drop outs are ignored"
                 }
             }
-        },
-        "error": {
-            "targets_required": "Choose at least one notify entity, since Supernotify is not installed"
         }
     }
 }
